@@ -111,15 +111,11 @@ config/private.yml
 
 # Go specific
 /bin/
-/pkg/
 *.o
 *.a
 *.out
-**/vendor/
 Gopkg.lock
 Gopkg.toml
-go.sum
-go.mod
 
 # Binaries for programs and plugins
 *.exe
