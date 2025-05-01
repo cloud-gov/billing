@@ -53,3 +53,87 @@ INSERT INTO cf_org (
 )
 RETURNING *;
 
+-- START Tier
+-- name: GetTier :one
+SELECT * FROM tier
+WHERE id = $1 LIMIT 1;
+
+-- name: ListTiers :many
+SELECT * FROM tier
+ORDER BY name;
+
+-- name: UpdateTier :exec
+UPDATE tier
+  set name = $2,
+  tier_credits = $3
+  WHERE id = $1;
+
+-- name: DeleteTier :exec
+DELETE FROM tier
+WHERE id = $1;
+
+-- name: CreateTier :one
+INSERT INTO tier (
+  name, tier_credits
+) VALUES (
+  $1, $2
+)
+RETURNING *;
+
+-- START billable resource
+-- name: GetBillableResource :one
+SELECT * FROM billable_resource
+WHERE id = $1 LIMIT 1;
+
+-- name: ListBillableResources :many
+SELECT * FROM billable_resource
+ORDER BY native_id;
+
+-- name: UpdateBillableResource :exec
+UPDATE billable_resource
+  set native_id = $2,
+  class_id = $3,
+  cf_org_id = $4
+  WHERE id = $1;
+
+-- name: DeleteBillableResouce :exec
+DELETE FROM billable_resource
+WHERE id = $1;
+
+-- name: CreateBillableResource :one
+INSERT INTO billable_resource (
+  native_id, class_id, cf_org_id
+) VALUES (
+  $1, $2, $3
+)
+RETURNING *;
+
+-- START Billable Class
+-- name: GetBillableClass :one
+SELECT * FROM billable_class
+WHERE id = $1 LIMIT 1;
+
+-- name: ListBillableClass :many
+SELECT * FROM billable_class
+ORDER BY native_id;
+
+-- name: UpdateBillableClass :exec
+UPDATE billable_class
+  set native_id = $2,
+  credits = $3,
+  amount = $4,
+  unit_of_measure = $5
+  WHERE id = $1;
+
+-- name: DeleteBillableClass :exec
+DELETE FROM billable_class
+WHERE id = $1;
+
+-- name: CreateBillableClass :one
+INSERT INTO billable_class (
+  native_id, credits, amount, unit_of_measure
+) VALUES (
+  $1, $2, $3, $4
+)
+RETURNING *;
+

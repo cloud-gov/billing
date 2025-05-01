@@ -8,6 +8,21 @@ import (
 	"database/sql"
 )
 
+type BillableClass struct {
+	ID            int32
+	NativeID      sql.NullString
+	Credits       sql.NullInt32
+	Amount        sql.NullInt32
+	UnitOfMeasure string
+}
+
+type BillableResource struct {
+	ID       int32
+	NativeID sql.NullString
+	ClassID  sql.NullString
+	CfOrgID  sql.NullInt64
+}
+
 type CfOrg struct {
 	ID           interface{}
 	Name         string

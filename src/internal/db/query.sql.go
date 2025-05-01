@@ -7,7 +7,69 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
+
+const createBillableClass = `-- name: CreateBillableClass :one
+INSERT INTO billable_class (
+  native_id, credits, amount, unit_of_measure
+) VALUES (
+  $1, $2, $3, $4
+)
+RETURNING id, native_id, credits, amount, unit_of_measure
+`
+
+type CreateBillableClassParams struct {
+	NativeID      sql.NullString
+	Credits       sql.NullInt32
+	Amount        sql.NullInt32
+	UnitOfMeasure string
+}
+
+func (q *Queries) CreateBillableClass(ctx context.Context, arg CreateBillableClassParams) (BillableClass, error) {
+	row := q.db.QueryRowContext(ctx, createBillableClass,
+		arg.NativeID,
+		arg.Credits,
+		arg.Amount,
+		arg.UnitOfMeasure,
+	)
+	var i BillableClass
+	err := row.Scan(
+		&i.ID,
+		&i.NativeID,
+		&i.Credits,
+		&i.Amount,
+		&i.UnitOfMeasure,
+	)
+	return i, err
+}
+
+const createBillableResource = `-- name: CreateBillableResource :one
+INSERT INTO billable_resource (
+  native_id, class_id, cf_org_id
+) VALUES (
+  $1, $2, $3
+)
+RETURNING id, native_id, class_id, cf_org_id
+`
+
+type CreateBillableResourceParams struct {
+	NativeID sql.NullString
+	ClassID  sql.NullString
+	CfOrgID  sql.NullInt64
+}
+
+func (q *Queries) CreateBillableResource(ctx context.Context, arg CreateBillableResourceParams) (BillableResource, error) {
+	row := q.db.QueryRowContext(ctx, createBillableResource, arg.NativeID, arg.ClassID, arg.CfOrgID)
+	var i BillableResource
+	err := row.Scan(
+		&i.ID,
+		&i.NativeID,
+		&i.ClassID,
+		&i.CfOrgID,
+	)
+	return i, err
+}
 
 const createCF_org = `-- name: CreateCF_org :one
 INSERT INTO cf_org (
@@ -67,6 +129,47 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 	return i, err
 }
 
+const createTier = `-- name: CreateTier :one
+INSERT INTO tier (
+  name, tier_credits
+) VALUES (
+  $1, $2
+)
+RETURNING id, name, tier_credits
+`
+
+type CreateTierParams struct {
+	Name        string
+	TierCredits sql.NullInt64
+}
+
+func (q *Queries) CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error) {
+	row := q.db.QueryRowContext(ctx, createTier, arg.Name, arg.TierCredits)
+	var i Tier
+	err := row.Scan(&i.ID, &i.Name, &i.TierCredits)
+	return i, err
+}
+
+const deleteBillableClass = `-- name: DeleteBillableClass :exec
+DELETE FROM billable_class
+WHERE id = $1
+`
+
+func (q *Queries) DeleteBillableClass(ctx context.Context, id int32) error {
+	_, err := q.db.ExecContext(ctx, deleteBillableClass, id)
+	return err
+}
+
+const deleteBillableResouce = `-- name: DeleteBillableResouce :exec
+DELETE FROM billable_resource
+WHERE id = $1
+`
+
+func (q *Queries) DeleteBillableResouce(ctx context.Context, id int32) error {
+	_, err := q.db.ExecContext(ctx, deleteBillableResouce, id)
+	return err
+}
+
 const deleteCF_org = `-- name: DeleteCF_org :exec
 DELETE FROM cf_org
 WHERE id = $1
@@ -85,6 +188,53 @@ WHERE id = $1
 func (q *Queries) DeleteCustomer(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteCustomer, id)
 	return err
+}
+
+const deleteTier = `-- name: DeleteTier :exec
+DELETE FROM tier
+WHERE id = $1
+`
+
+func (q *Queries) DeleteTier(ctx context.Context, id int32) error {
+	_, err := q.db.ExecContext(ctx, deleteTier, id)
+	return err
+}
+
+const getBillableClass = `-- name: GetBillableClass :one
+SELECT id, native_id, credits, amount, unit_of_measure FROM billable_class
+WHERE id = $1 LIMIT 1
+`
+
+// START Billable Class
+func (q *Queries) GetBillableClass(ctx context.Context, id int32) (BillableClass, error) {
+	row := q.db.QueryRowContext(ctx, getBillableClass, id)
+	var i BillableClass
+	err := row.Scan(
+		&i.ID,
+		&i.NativeID,
+		&i.Credits,
+		&i.Amount,
+		&i.UnitOfMeasure,
+	)
+	return i, err
+}
+
+const getBillableResource = `-- name: GetBillableResource :one
+SELECT id, native_id, class_id, cf_org_id FROM billable_resource
+WHERE id = $1 LIMIT 1
+`
+
+// START billable resource
+func (q *Queries) GetBillableResource(ctx context.Context, id int32) (BillableResource, error) {
+	row := q.db.QueryRowContext(ctx, getBillableResource, id)
+	var i BillableResource
+	err := row.Scan(
+		&i.ID,
+		&i.NativeID,
+		&i.ClassID,
+		&i.CfOrgID,
+	)
+	return i, err
 }
 
 const getCF_Org = `-- name: GetCF_Org :one
@@ -118,6 +268,86 @@ func (q *Queries) GetCustomer(ctx context.Context, id int64) (Customer, error) {
 	var i Customer
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
+}
+
+const getTier = `-- name: GetTier :one
+SELECT id, name, tier_credits FROM tier
+WHERE id = $1 LIMIT 1
+`
+
+// START Tier
+func (q *Queries) GetTier(ctx context.Context, id int32) (Tier, error) {
+	row := q.db.QueryRowContext(ctx, getTier, id)
+	var i Tier
+	err := row.Scan(&i.ID, &i.Name, &i.TierCredits)
+	return i, err
+}
+
+const listBillableClass = `-- name: ListBillableClass :many
+SELECT id, native_id, credits, amount, unit_of_measure FROM billable_class
+ORDER BY native_id
+`
+
+func (q *Queries) ListBillableClass(ctx context.Context) ([]BillableClass, error) {
+	rows, err := q.db.QueryContext(ctx, listBillableClass)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BillableClass
+	for rows.Next() {
+		var i BillableClass
+		if err := rows.Scan(
+			&i.ID,
+			&i.NativeID,
+			&i.Credits,
+			&i.Amount,
+			&i.UnitOfMeasure,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBillableResources = `-- name: ListBillableResources :many
+SELECT id, native_id, class_id, cf_org_id FROM billable_resource
+ORDER BY native_id
+`
+
+func (q *Queries) ListBillableResources(ctx context.Context) ([]BillableResource, error) {
+	rows, err := q.db.QueryContext(ctx, listBillableResources)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BillableResource
+	for rows.Next() {
+		var i BillableResource
+		if err := rows.Scan(
+			&i.ID,
+			&i.NativeID,
+			&i.ClassID,
+			&i.CfOrgID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCF_orgs = `-- name: ListCF_orgs :many
@@ -183,6 +413,87 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	return items, nil
 }
 
+const listTiers = `-- name: ListTiers :many
+SELECT id, name, tier_credits FROM tier
+ORDER BY name
+`
+
+func (q *Queries) ListTiers(ctx context.Context) ([]Tier, error) {
+	rows, err := q.db.QueryContext(ctx, listTiers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tier
+	for rows.Next() {
+		var i Tier
+		if err := rows.Scan(&i.ID, &i.Name, &i.TierCredits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateBillableClass = `-- name: UpdateBillableClass :exec
+UPDATE billable_class
+  set native_id = $2,
+  credits = $3,
+  amount = $4,
+  unit_of_measure = $5
+  WHERE id = $1
+`
+
+type UpdateBillableClassParams struct {
+	ID            int32
+	NativeID      sql.NullString
+	Credits       sql.NullInt32
+	Amount        sql.NullInt32
+	UnitOfMeasure string
+}
+
+func (q *Queries) UpdateBillableClass(ctx context.Context, arg UpdateBillableClassParams) error {
+	_, err := q.db.ExecContext(ctx, updateBillableClass,
+		arg.ID,
+		arg.NativeID,
+		arg.Credits,
+		arg.Amount,
+		arg.UnitOfMeasure,
+	)
+	return err
+}
+
+const updateBillableResource = `-- name: UpdateBillableResource :exec
+UPDATE billable_resource
+  set native_id = $2,
+  class_id = $3,
+  cf_org_id = $4
+  WHERE id = $1
+`
+
+type UpdateBillableResourceParams struct {
+	ID       int32
+	NativeID sql.NullString
+	ClassID  sql.NullString
+	CfOrgID  sql.NullInt64
+}
+
+func (q *Queries) UpdateBillableResource(ctx context.Context, arg UpdateBillableResourceParams) error {
+	_, err := q.db.ExecContext(ctx, updateBillableResource,
+		arg.ID,
+		arg.NativeID,
+		arg.ClassID,
+		arg.CfOrgID,
+	)
+	return err
+}
+
 const updateCF_org = `-- name: UpdateCF_org :exec
 UPDATE cf_org
   set name = $2,
@@ -224,5 +535,23 @@ type UpdateCustomerParams struct {
 
 func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, updateCustomer, arg.ID, arg.Name)
+	return err
+}
+
+const updateTier = `-- name: UpdateTier :exec
+UPDATE tier
+  set name = $2,
+  tier_credits = $3
+  WHERE id = $1
+`
+
+type UpdateTierParams struct {
+	ID          int32
+	Name        string
+	TierCredits sql.NullInt64
+}
+
+func (q *Queries) UpdateTier(ctx context.Context, arg UpdateTierParams) error {
+	_, err := q.db.ExecContext(ctx, updateTier, arg.ID, arg.Name, arg.TierCredits)
 	return err
 }

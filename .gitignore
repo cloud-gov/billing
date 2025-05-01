@@ -176,7 +176,7 @@ manifest-*.yml
 
 # Logs, Databases, and Configuration Files
 *.log
-*.sql
+# *.sql
 *.sqlite
 *.sqlite3
 /log/
