@@ -1,5 +1,4 @@
-// Package meter reads usage information from Cloud Foundry and AWS.
-package meter
+package api
 
 import (
 	"encoding/json"
@@ -8,19 +7,29 @@ import (
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/cloud-gov/billing/internal/usage/meter"
+	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-func New(logger *slog.Logger, cf *client.Client) http.Handler {
+// routes registers all routes for the server.
+func Routes(logger *slog.Logger, cf *client.Client) http.Handler {
 	mux := chi.NewMux()
-	l := logger.WithGroup("meter")
-	mux.Get("/", Handle(l, cf))
+	mux.Use(middleware.Logger)
+	mux.Handle("/meter", handleMeter(logger.WithGroup("meter"), cf))
 	return mux
 }
 
 // First draft. Later, this will be a scheduled background job.
-func Handle(logger *slog.Logger, cf *client.Client) http.HandlerFunc {
+func handleMeter(logger *slog.Logger, cf *client.Client) http.HandlerFunc {
+	meters := []reader.Meter{
+		meter.NewCFServiceMeter(cf.ServiceInstances, cf.Spaces),
+	}
+	reader := reader.New(meters)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		readings, err := ReadUsage(r.Context(), cf.ServiceInstances, cf.Spaces)
+		readings, err := reader.Read(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -38,5 +47,3 @@ func Handle(logger *slog.Logger, cf *client.Client) http.HandlerFunc {
 		}
 	})
 }
-
-// next step: POST a ReadMeter job or something. Starts a job which finishes when services are read and result is stored in the database.

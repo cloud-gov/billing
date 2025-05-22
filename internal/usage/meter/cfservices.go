@@ -6,6 +6,8 @@ import (
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
+
+	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
 // Abstract to an interface so we can create a mock client for testing.
@@ -17,36 +19,38 @@ type CFSpaceClient interface {
 	GetIncludeOrganization(context.Context, string) (*resource.Space, *resource.Organization, error)
 }
 
-// Reading is a single point-in-time snapshot of the utilization of a billable resource. Reading only includes information gleaned directly from the target system -- not the database.
-type Reading struct {
-	OrgID      string
-	PlanID     string
-	InstanceID string
-	Value      int
-	Time       time.Time
-	Errs       []error
+// CFServiceMeter reads usage from Cloud Foundry service instances.
+type CFServiceMeter struct {
+	services CFServiceInstanceClient
+	spaces   CFSpaceClient
 }
 
-// ReadUsage function gets usage across all paid resources.
-// First draft: Just do top-level services. TODO: Applications and sub-resources.
+func NewCFServiceMeter(services CFServiceInstanceClient, spaces CFSpaceClient) *CFServiceMeter {
+	return &CFServiceMeter{
+		services: services,
+		spaces:   spaces,
+	}
+}
+
+// ReadUsage returns the point-in-time usage of services in Cloud Foundry.
 // Returns a non-nil error if there was an error during the overall process of reading usage information from the target system. If individual readings had errors, their errs fields should be set.
-func ReadUsage(ctx context.Context, services CFServiceInstanceClient, spaces CFSpaceClient) ([]Reading, error) {
-	si, err := services.ListAll(ctx, &client.ServiceInstanceListOptions{
+func (p *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Reading, error) {
+	si, err := p.services.ListAll(ctx, &client.ServiceInstanceListOptions{
 		Type: "managed", // Ignore user-provided services, which we do not bill for. IMPORTANT: If this is not set, user-provided services will be included. Some response fields that we assume are non-nil, like .Relationships, will be nil on user-provided services. The code below does not guard against this and will panic.
 	})
 	if err != nil {
 		return nil, err
 	}
-	usage := make([]Reading, len(si))
+	usage := make([]reader.Reading, len(si))
 	now := time.Now().UTC()
 
 	for i, instance := range si {
-		_, org, err := spaces.GetIncludeOrganization(ctx, instance.Relationships.Space.Data.GUID)
+		_, org, err := p.spaces.GetIncludeOrganization(ctx, instance.Relationships.Space.Data.GUID)
 		orgID := ""
 		if err != nil {
 			orgID = org.GUID
 		}
-		usage[i] = Reading{
+		usage[i] = reader.Reading{
 			OrgID:      orgID,
 			PlanID:     instance.Relationships.ServicePlan.Data.GUID,
 			InstanceID: instance.GUID,

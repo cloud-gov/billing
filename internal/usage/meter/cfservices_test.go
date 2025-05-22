@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/cloud-gov/billing/internal/cf"
-	"github.com/cloud-gov/billing/internal/meter"
+	"github.com/cloud-gov/billing/internal/usage/meter"
 )
 
 func TestReadUsage(t *testing.T) {
@@ -48,7 +48,8 @@ func TestReadUsage(t *testing.T) {
 	})
 
 	// act
-	readings, err := meter.ReadUsage(t.Context(), &services, &spaces)
+	sut := meter.NewCFServiceMeter(&services, &spaces)
+	readings, err := sut.ReadUsage(t.Context())
 
 	// assert
 	if err != nil {
