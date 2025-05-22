@@ -8,16 +8,20 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/cloud-gov/billing/internal/meter"
 	"github.com/cloud-gov/billing/internal/server"
 )
 
 // routes registers all routes for the server.
-func routes() http.Handler {
+func routes(logger *slog.Logger, cf *client.Client) http.Handler {
 	mux := chi.NewMux()
 	mux.Use(middleware.Logger)
+	mux.Handle("/", meter.New(logger, cf))
 	return mux
 }
 
@@ -33,7 +37,18 @@ func run(ctx context.Context, out io.Writer) error {
 		Level: slog.LevelInfo,
 	}))
 
-	srv := server.New("", "8080", routes(), logger)
+	cfconf, err := config.NewFromCFHome()
+	if err != nil {
+		return err
+	}
+	cfclient, err := client.New(cfconf)
+	if err != nil {
+		return err
+	}
+	// db := db.NewMockDB()
+	// logger.Info("running with in-memory mock database")
+
+	srv := server.New("", "8080", routes(logger, cfclient), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }
