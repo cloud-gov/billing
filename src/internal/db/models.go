@@ -6,6 +6,8 @@ package db
 
 import (
 	"database/sql"
+
+	"github.com/google/uuid"
 )
 
 type BillableClass struct {
@@ -20,11 +22,11 @@ type BillableResource struct {
 	ID       int32
 	NativeID sql.NullString
 	ClassID  sql.NullString
-	CfOrgID  sql.NullInt64
+	CfOrgID  uuid.NullUUID
 }
 
 type CfOrg struct {
-	ID           interface{}
+	ID           uuid.UUID
 	Name         string
 	TierID       string
 	CreditsQuota int64

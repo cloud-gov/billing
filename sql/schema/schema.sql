@@ -4,7 +4,7 @@ CREATE TABLE customer (
 );
 
 CREATE TABLE cf_org (
-  id GUID PRIMARY KEY,
+  id UUID PRIMARY KEY,
   name TEXT NOT NULL,
   tier_id TEXT NOT NULL,
   credits_quota BIGINT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE billable_resource (
   id SERIAL PRIMARY KEY,
   native_id TEXT,
   class_id TEXT,
-  cf_org_id BIGINT,
+  cf_org_id UUID,
   CONSTRAINT fk_cf_org_id Foreign Key (cf_org_id) REFERENCES cf_org(id)
 );
 

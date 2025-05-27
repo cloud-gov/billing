@@ -8,6 +8,8 @@ package db
 import (
 	"context"
 	"database/sql"
+
+	"github.com/google/uuid"
 )
 
 const createBillableClass = `-- name: CreateBillableClass :one
@@ -56,7 +58,7 @@ RETURNING id, native_id, class_id, cf_org_id
 type CreateBillableResourceParams struct {
 	NativeID sql.NullString
 	ClassID  sql.NullString
-	CfOrgID  sql.NullInt64
+	CfOrgID  uuid.NullUUID
 }
 
 func (q *Queries) CreateBillableResource(ctx context.Context, arg CreateBillableResourceParams) (BillableResource, error) {
@@ -175,7 +177,7 @@ DELETE FROM cf_org
 WHERE id = $1
 `
 
-func (q *Queries) DeleteCF_org(ctx context.Context, id interface{}) error {
+func (q *Queries) DeleteCF_org(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteCF_org, id)
 	return err
 }
@@ -243,7 +245,7 @@ WHERE id = $1 LIMIT 1
 `
 
 // START CF_ORG
-func (q *Queries) GetCF_Org(ctx context.Context, id interface{}) (CfOrg, error) {
+func (q *Queries) GetCF_Org(ctx context.Context, id uuid.UUID) (CfOrg, error) {
 	row := q.db.QueryRowContext(ctx, getCF_Org, id)
 	var i CfOrg
 	err := row.Scan(
@@ -481,7 +483,7 @@ type UpdateBillableResourceParams struct {
 	ID       int32
 	NativeID sql.NullString
 	ClassID  sql.NullString
-	CfOrgID  sql.NullInt64
+	CfOrgID  uuid.NullUUID
 }
 
 func (q *Queries) UpdateBillableResource(ctx context.Context, arg UpdateBillableResourceParams) error {
@@ -504,7 +506,7 @@ WHERE id = $1
 `
 
 type UpdateCF_orgParams struct {
-	ID           interface{}
+	ID           uuid.UUID
 	Name         string
 	TierID       string
 	CreditsQuota int64
