@@ -25,15 +25,15 @@ DELETE FROM customer
 WHERE id = $1;
 
 -- START CF_ORG
--- name: GetCF_Org :one
+-- name: GetCFOrg :one
 SELECT * FROM cf_org
 WHERE id = $1 LIMIT 1;
 
--- name: ListCF_orgs :many
+-- name: ListCFOrgs :many
 SELECT * FROM cf_org
 ORDER BY name;
 
--- name: UpdateCF_org :exec
+-- name: UpdateCFOrg :exec
 UPDATE cf_org
   set name = $2,
   tier_id = $3,
@@ -41,11 +41,11 @@ UPDATE cf_org
   credits_used = $5
 WHERE id = $1;
 
--- name: DeleteCF_org :exec
+-- name: DeleteCFOrg :exec
 DELETE FROM cf_org
 WHERE id = $1;
 
--- name: CreateCF_org :one
+-- name: CreateCFOrg :one
 INSERT INTO cf_org (
   name, tier_id, credits_quota, credits_used, customer_id
 ) VALUES (
@@ -104,7 +104,7 @@ WHERE id = $1;
 INSERT INTO billable_resource (
   native_id, class_id, cf_org_id
 ) VALUES (
-  $1, $2, $3
+  $1, $2, $3 
 )
 RETURNING *;
 

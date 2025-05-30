@@ -21,14 +21,14 @@ type BillableClass struct {
 type BillableResource struct {
 	ID       int32
 	NativeID sql.NullString
-	ClassID  sql.NullString
+	ClassID  sql.NullInt32
 	CfOrgID  uuid.NullUUID
 }
 
 type CfOrg struct {
 	ID           uuid.UUID
 	Name         string
-	TierID       string
+	TierID       int32
 	CreditsQuota int64
 	CreditsUsed  int64
 	CustomerID   int64

@@ -50,14 +50,14 @@ const createBillableResource = `-- name: CreateBillableResource :one
 INSERT INTO billable_resource (
   native_id, class_id, cf_org_id
 ) VALUES (
-  $1, $2, $3
+  $1, $2, $3 
 )
 RETURNING id, native_id, class_id, cf_org_id
 `
 
 type CreateBillableResourceParams struct {
 	NativeID sql.NullString
-	ClassID  sql.NullString
+	ClassID  sql.NullInt32
 	CfOrgID  uuid.NullUUID
 }
 
@@ -73,7 +73,7 @@ func (q *Queries) CreateBillableResource(ctx context.Context, arg CreateBillable
 	return i, err
 }
 
-const createCF_org = `-- name: CreateCF_org :one
+const createCFOrg = `-- name: CreateCFOrg :one
 INSERT INTO cf_org (
   name, tier_id, credits_quota, credits_used, customer_id
 ) VALUES (
@@ -82,16 +82,16 @@ INSERT INTO cf_org (
 RETURNING id, name, tier_id, credits_quota, credits_used, customer_id
 `
 
-type CreateCF_orgParams struct {
+type CreateCFOrgParams struct {
 	Name         string
-	TierID       string
+	TierID       int32
 	CreditsQuota int64
 	CreditsUsed  int64
 	CustomerID   int64
 }
 
-func (q *Queries) CreateCF_org(ctx context.Context, arg CreateCF_orgParams) (CfOrg, error) {
-	row := q.db.QueryRowContext(ctx, createCF_org,
+func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CfOrg, error) {
+	row := q.db.QueryRowContext(ctx, createCFOrg,
 		arg.Name,
 		arg.TierID,
 		arg.CreditsQuota,
@@ -172,13 +172,13 @@ func (q *Queries) DeleteBillableResouce(ctx context.Context, id int32) error {
 	return err
 }
 
-const deleteCF_org = `-- name: DeleteCF_org :exec
+const deleteCFOrg = `-- name: DeleteCFOrg :exec
 DELETE FROM cf_org
 WHERE id = $1
 `
 
-func (q *Queries) DeleteCF_org(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteCF_org, id)
+func (q *Queries) DeleteCFOrg(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteCFOrg, id)
 	return err
 }
 
@@ -239,14 +239,14 @@ func (q *Queries) GetBillableResource(ctx context.Context, id int32) (BillableRe
 	return i, err
 }
 
-const getCF_Org = `-- name: GetCF_Org :one
+const getCFOrg = `-- name: GetCFOrg :one
 SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
 WHERE id = $1 LIMIT 1
 `
 
 // START CF_ORG
-func (q *Queries) GetCF_Org(ctx context.Context, id uuid.UUID) (CfOrg, error) {
-	row := q.db.QueryRowContext(ctx, getCF_Org, id)
+func (q *Queries) GetCFOrg(ctx context.Context, id uuid.UUID) (CfOrg, error) {
+	row := q.db.QueryRowContext(ctx, getCFOrg, id)
 	var i CfOrg
 	err := row.Scan(
 		&i.ID,
@@ -352,13 +352,13 @@ func (q *Queries) ListBillableResources(ctx context.Context) ([]BillableResource
 	return items, nil
 }
 
-const listCF_orgs = `-- name: ListCF_orgs :many
+const listCFOrgs = `-- name: ListCFOrgs :many
 SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
 ORDER BY name
 `
 
-func (q *Queries) ListCF_orgs(ctx context.Context) ([]CfOrg, error) {
-	rows, err := q.db.QueryContext(ctx, listCF_orgs)
+func (q *Queries) ListCFOrgs(ctx context.Context) ([]CfOrg, error) {
+	rows, err := q.db.QueryContext(ctx, listCFOrgs)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ UPDATE billable_resource
 type UpdateBillableResourceParams struct {
 	ID       int32
 	NativeID sql.NullString
-	ClassID  sql.NullString
+	ClassID  sql.NullInt32
 	CfOrgID  uuid.NullUUID
 }
 
@@ -496,7 +496,7 @@ func (q *Queries) UpdateBillableResource(ctx context.Context, arg UpdateBillable
 	return err
 }
 
-const updateCF_org = `-- name: UpdateCF_org :exec
+const updateCFOrg = `-- name: UpdateCFOrg :exec
 UPDATE cf_org
   set name = $2,
   tier_id = $3,
@@ -505,16 +505,16 @@ UPDATE cf_org
 WHERE id = $1
 `
 
-type UpdateCF_orgParams struct {
+type UpdateCFOrgParams struct {
 	ID           uuid.UUID
 	Name         string
-	TierID       string
+	TierID       int32
 	CreditsQuota int64
 	CreditsUsed  int64
 }
 
-func (q *Queries) UpdateCF_org(ctx context.Context, arg UpdateCF_orgParams) error {
-	_, err := q.db.ExecContext(ctx, updateCF_org,
+func (q *Queries) UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error {
+	_, err := q.db.ExecContext(ctx, updateCFOrg,
 		arg.ID,
 		arg.Name,
 		arg.TierID,
