@@ -25,6 +25,7 @@ func Routes(logger *slog.Logger, cf *client.Client) http.Handler {
 func handleMeter(logger *slog.Logger, cf *client.Client) http.HandlerFunc {
 	meters := []reader.Meter{
 		meter.NewCFServiceMeter(cf.ServiceInstances, cf.Spaces),
+		meter.NewCFProcessMeter(cf.Applications, cf.Processes),
 	}
 	reader := reader.New(meters)
 
