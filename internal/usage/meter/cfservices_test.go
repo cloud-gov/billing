@@ -56,10 +56,10 @@ func Test_CFServices_ReadUsage(t *testing.T) {
 		t.Fatal("error was not expected when reading usage", err)
 	}
 	r := readings[0]
-	if r.InstanceID != instanceID {
+	if r.ResourceNaturalID != instanceID {
 		t.Fatal("instance ID did not match")
 	}
-	if r.PlanID != planID {
+	if r.ResourceKindNaturalID != planID {
 		t.Fatal("plan ID did not match")
 	}
 }

@@ -58,9 +58,9 @@ func (m *CFProcessMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 		})
 
 		m := reader.Measurement{
-			InstanceID: proc.GUID,
-			Value:      val, // In MB. TODO: make sure units align.
-			Errs:       []error{},
+			ResourceNaturalID: proc.GUID,
+			Value:             val, // In MB. TODO: make sure units align.
+			Errs:              []error{},
 		}
 
 		// Since procs and apps came from different requests, there is a chance their data will not match and appIdx = -1.
@@ -75,7 +75,6 @@ func (m *CFProcessMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 			orgGUID := spaces[sidx].Relationships.Organization.Data.GUID
 
 			m.OrgID = orgGUID
-			m.PlanID = ""
 		}
 
 		readings[i] = m

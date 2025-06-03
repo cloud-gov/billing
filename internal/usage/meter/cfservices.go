@@ -49,11 +49,11 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 			orgID = org.GUID
 		}
 		usage[i] = reader.Measurement{
-			OrgID:      orgID,
-			PlanID:     instance.Relationships.ServicePlan.Data.GUID,
-			InstanceID: instance.GUID,
-			Value:      1, // For this type of service, 1 indicates it is present at time of reading
-			Errs:       []error{errr},
+			OrgID:                 orgID,
+			ResourceKindNaturalID: instance.Relationships.ServicePlan.Data.GUID,
+			ResourceNaturalID:     instance.GUID,
+			Value:                 1, // For this type of service, 1 indicates it is present at time of reading
+			Errs:                  []error{errr},
 		}
 	}
 	return usage, nil

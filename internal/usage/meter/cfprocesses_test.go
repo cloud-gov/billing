@@ -68,11 +68,11 @@ func Test_CFApps_ReadUsage(t *testing.T) {
 	}
 
 	m := measurements[0]
-	if m.InstanceID != procID {
-		t.Fatalf("expected process ID %v, got %v", procID, m.InstanceID)
+	if m.ResourceNaturalID != procID {
+		t.Fatalf("expected process ID %v, got %v", procID, m.ResourceNaturalID)
 	}
-	if m.PlanID != "" {
-		t.Fatalf("expected plan ID %v, got %v", "", m.PlanID)
+	if m.ResourceKindNaturalID != "" {
+		t.Fatalf("expected plan ID %v, got %v", "", m.ResourceKindNaturalID)
 	}
 	if m.OrgID != orgID {
 		t.Fatalf("expected org ID %v, got %v", orgID, m.OrgID)
