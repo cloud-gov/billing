@@ -26,21 +26,21 @@ type CFAppClient interface {
 	ListIncludeSpacesAll(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, error)
 }
 
-type CFProcessMeter struct {
+type CFAppMeter struct {
 	name      string
 	apps      CFAppClient
 	processes CFProcessClient
 }
 
-func NewCFProcessMeter(apps CFAppClient, processes CFProcessClient) *CFProcessMeter {
-	return &CFProcessMeter{
+func NewCFAppMeter(apps CFAppClient, processes CFProcessClient) *CFAppMeter {
+	return &CFAppMeter{
 		name:      "cfapps",
 		apps:      apps,
 		processes: processes,
 	}
 }
 
-func (m *CFProcessMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
+func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
 	procs, err := m.processes.ListAll(ctx, client.NewProcessOptions())
 	if err != nil {
 		return []reader.Measurement{}, err

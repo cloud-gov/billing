@@ -83,7 +83,7 @@ func measurementErrsToMap(ms []reader.Measurement) map[string]error {
 	return out
 }
 
-func TestCFProcessMeter_ReadUsage(t *testing.T) {
+func TestCFAppMeter_ReadUsage(t *testing.T) {
 	const (
 		app1 = "app‑1"
 		app2 = "app‑2"
@@ -200,7 +200,7 @@ func TestCFProcessMeter_ReadUsage(t *testing.T) {
 				}
 			}()
 
-			sut := meter.NewCFProcessMeter(&MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
+			sut := meter.NewCFAppMeter(&MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
 
 			got, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {

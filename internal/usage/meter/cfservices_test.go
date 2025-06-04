@@ -8,7 +8,7 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/meter"
 )
 
-func Test_CFServices_ReadUsage(t *testing.T) {
+func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	// arrange
 	services := NewMockServiceInstanceClient()
 	spaces := NewMockSpaceClient()
