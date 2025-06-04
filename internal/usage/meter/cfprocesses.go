@@ -11,8 +11,11 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
+const appStateStarted = "STARTED"
+
 var (
-	ErrAppNotFound = errors.New("processes meter: application not found")
+	ErrAppNotFound   = errors.New("CF processes meter: application not found")
+	ErrSpaceNotFound = errors.New("CF processes meter: space not found")
 )
 
 type CFProcessClient interface {
@@ -49,31 +52,30 @@ func (m *CFProcessMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 
 	var readings = make([]reader.Measurement, len(apps))
 
-	// Convert each Process to a Measurement.
-	for i, proc := range procs {
-		val := proc.MemoryInMB * proc.Instances
-		appGUID := proc.Relationships.App.Data.GUID
-		appIdx := slices.IndexFunc(apps, func(app *resource.App) bool {
-			return app.GUID == appGUID
-		})
+	// Aggregate process usage info by app.
+	appUsage := make(map[string]int, len(apps))
+	for _, proc := range procs {
+		usage := proc.Instances * proc.MemoryInMB
+		appUsage[proc.Relationships.App.Data.GUID] += usage
+	}
 
-		m := reader.Measurement{
-			ResourceNaturalID: proc.GUID,
-			Value:             val, // In MB. TODO: make sure units align.
-			Errs:              []error{},
+	for i, app := range apps {
+		if app.State != appStateStarted {
+			// Only STARTED apps consume resources. Skip the rest.
+			continue
 		}
-
-		// Since procs and apps came from different requests, there is a chance their data will not match and appIdx = -1.
-		if appIdx < 0 {
-			m.Errs = append(m.Errs, ErrAppNotFound)
+		m := reader.Measurement{
+			ResourceNaturalID: app.GUID,
+			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
+		}
+		spaceGUID := app.Relationships.Space.Data.GUID
+		sidx := slices.IndexFunc(spaces, func(s *resource.Space) bool {
+			return s.GUID == spaceGUID
+		})
+		if sidx < 0 {
+			m.Errs = errors.Join(m.Errs, ErrSpaceNotFound)
 		} else {
-			app := apps[appIdx]
-			spaceGUID := app.Relationships.Space.Data.GUID
-			sidx := slices.IndexFunc(spaces, func(s *resource.Space) bool {
-				return s.GUID == spaceGUID
-			})
 			orgGUID := spaces[sidx].Relationships.Organization.Data.GUID
-
 			m.OrgID = orgGUID
 		}
 

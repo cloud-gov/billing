@@ -21,7 +21,8 @@ type Measurement struct {
 	// ResourceNaturalID is the "natural" ID of the billable Resource being measured. The ID is maintained by the external system. For example, the service instance GUID of a Cloud Foundry service instance, or the process ID of a Cloud Foundry process.
 	ResourceNaturalID string
 	Value             int
-	Errs              []error
+	// Errs contains any errors that occurred while gathering information about this particular measurement. It exists so we can preserve as much data as possible about the measurement. For instance, if we record a resource but fail to get its corresponding organization, a Measurement should be returned with a blank OrgID field and an Errs field including the error. Use [errors.Join] to add new errors.
+	Errs error
 }
 
 // Meter defines a type that can read usage information from a system containing billable resources, akin to a utility meter.

@@ -19,6 +19,7 @@ func newUUID() string {
 type MockAppClient struct {
 	Apps   []*resource.App
 	Spaces []*resource.Space
+	AppErr error
 }
 
 func NewMockAppClient() *MockAppClient {
@@ -28,8 +29,8 @@ func NewMockAppClient() *MockAppClient {
 	}
 }
 
-func (c *MockAppClient) ListIncludeSpacesAll(ctx context.Context, opts *client.AppListOptions) ([]*resource.App, []*resource.Space, error) {
-	return c.Apps, c.Spaces, nil
+func (c *MockAppClient) ListIncludeSpacesAll(_ context.Context, _ *client.AppListOptions) ([]*resource.App, []*resource.Space, error) {
+	return c.Apps, c.Spaces, c.AppErr
 }
 
 // MockServiceInstanceClient is an in-memory implementation of [meter.CFServiceInstanceClient].
@@ -44,7 +45,7 @@ func NewMockServiceInstanceClient() *MockServiceInstanceClient {
 	}
 }
 
-func (c *MockServiceInstanceClient) ListAll(ctx context.Context, opts *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
+func (c *MockServiceInstanceClient) ListAll(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
 	return c.ServiceInstances, nil
 }
 
@@ -62,7 +63,7 @@ func NewMockSpaceClient() *MockSpaceClient {
 	}
 }
 
-func (c *MockSpaceClient) GetIncludeOrganization(ctx context.Context, guid string) (*resource.Space, *resource.Organization, error) {
+func (c *MockSpaceClient) GetIncludeOrganization(_ context.Context, guid string) (*resource.Space, *resource.Organization, error) {
 	spaceIdx := slices.IndexFunc(c.Spaces, func(s *resource.Space) bool {
 		return s.GUID == guid
 	})
@@ -81,6 +82,7 @@ func (c *MockSpaceClient) GetIncludeOrganization(ctx context.Context, guid strin
 // MockProcessClient is an in-memory implementation of [meter.CFProcessClient].
 type MockProcessClient struct {
 	Processes []*resource.Process
+	Err       error
 }
 
 func NewMockProcessClient() *MockProcessClient {
@@ -89,6 +91,6 @@ func NewMockProcessClient() *MockProcessClient {
 	}
 }
 
-func (c *MockProcessClient) ListAll(ctx context.Context, opts *client.ProcessListOptions) ([]*resource.Process, error) {
-	return c.Processes, nil
+func (c *MockProcessClient) ListAll(_ context.Context, _ *client.ProcessListOptions) ([]*resource.Process, error) {
+	return c.Processes, c.Err
 }

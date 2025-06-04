@@ -34,7 +34,6 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
 	// db := db.NewMockDB()
 	// logger.Info("running with in-memory mock database")
 
