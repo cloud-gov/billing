@@ -23,7 +23,7 @@ func run(ctx context.Context, out io.Writer) error {
 	defer cancel()
 
 	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: slog.LevelDebug,
 	}))
 
 	cfconf, err := config.NewFromCFHome()

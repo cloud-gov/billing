@@ -1,23 +1,23 @@
 package meter_test
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
-	"github.com/google/uuid"
 
-	"github.com/cloud-gov/billing/internal/cf"
 	"github.com/cloud-gov/billing/internal/usage/meter"
 )
 
-func TestReadUsage(t *testing.T) {
+func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	// arrange
-	services := cf.NewMockServiceInstanceClient()
-	spaces := cf.NewMockSpaceClient()
+	services := NewMockServiceInstanceClient()
+	spaces := NewMockSpaceClient()
 
-	instanceID := uuid.New().String()
-	planID := uuid.New().String()
-	spaceID := uuid.New().String()
+	instanceID := newUUID()
+	planID := newUUID()
+	spaceID := newUUID()
+	orgID := newUUID()
 
 	services.ServiceInstances = append(services.ServiceInstances, &resource.ServiceInstance{
 		Resource: resource.Resource{
@@ -36,19 +36,22 @@ func TestReadUsage(t *testing.T) {
 			},
 		},
 	})
-	spaces.OrgsForSpaces[spaceID] = &resource.Organization{
-		Resource: resource.Resource{
-			GUID: uuid.New().String(),
-		},
-	}
 	spaces.Spaces = append(spaces.Spaces, &resource.Space{
 		Resource: resource.Resource{
 			GUID: spaceID,
 		},
+		Relationships: &resource.SpaceRelationships{
+			Organization: &resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: orgID,
+				},
+			},
+		},
 	})
 
+	sut := meter.NewCFServiceMeter(slog.Default(), services, spaces)
+
 	// act
-	sut := meter.NewCFServiceMeter(&services, &spaces)
 	readings, err := sut.ReadUsage(t.Context())
 
 	// assert
@@ -56,10 +59,10 @@ func TestReadUsage(t *testing.T) {
 		t.Fatal("error was not expected when reading usage", err)
 	}
 	r := readings[0]
-	if r.InstanceID != instanceID {
+	if r.ResourceNaturalID != instanceID {
 		t.Fatal("instance ID did not match")
 	}
-	if r.PlanID != planID {
+	if r.ResourceKindNaturalID != planID {
 		t.Fatal("plan ID did not match")
 	}
 }
