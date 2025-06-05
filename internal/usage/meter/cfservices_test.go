@@ -1,6 +1,7 @@
 package meter_test
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
@@ -35,18 +36,20 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 			},
 		},
 	})
-	spaces.OrgsForSpaces[spaceID] = &resource.Organization{
-		Resource: resource.Resource{
-			GUID: orgID,
-		},
-	}
 	spaces.Spaces = append(spaces.Spaces, &resource.Space{
 		Resource: resource.Resource{
 			GUID: spaceID,
 		},
+		Relationships: &resource.SpaceRelationships{
+			Organization: &resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: orgID,
+				},
+			},
+		},
 	})
 
-	sut := meter.NewCFServiceMeter(services, spaces)
+	sut := meter.NewCFServiceMeter(slog.Default(), services, spaces)
 
 	// act
 	readings, err := sut.ReadUsage(t.Context())

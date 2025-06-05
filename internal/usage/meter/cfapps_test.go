@@ -2,6 +2,7 @@ package meter_test
 
 import (
 	"errors"
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -200,7 +201,7 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 				}
 			}()
 
-			sut := meter.NewCFAppMeter(&MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
+			sut := meter.NewCFAppMeter(slog.Default(), &MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
 
 			got, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {

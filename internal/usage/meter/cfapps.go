@@ -3,6 +3,7 @@ package meter
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
@@ -27,13 +28,16 @@ type CFAppClient interface {
 }
 
 type CFAppMeter struct {
-	name      string
+	logger *slog.Logger
+	name   string
+
 	apps      CFAppClient
 	processes CFProcessClient
 }
 
-func NewCFAppMeter(apps CFAppClient, processes CFProcessClient) *CFAppMeter {
+func NewCFAppMeter(logger *slog.Logger, apps CFAppClient, processes CFProcessClient) *CFAppMeter {
 	return &CFAppMeter{
+		logger:    logger.WithGroup("CFAppMeter"),
 		name:      "cfapps",
 		apps:      apps,
 		processes: processes,
@@ -41,10 +45,12 @@ func NewCFAppMeter(apps CFAppClient, processes CFProcessClient) *CFAppMeter {
 }
 
 func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
+	m.logger.DebugContext(ctx, "app meter: listing processes")
 	procs, err := m.processes.ListAll(ctx, client.NewProcessOptions())
 	if err != nil {
 		return []reader.Measurement{}, err
 	}
+	m.logger.DebugContext(ctx, "app meter: listing apps")
 	apps, spaces, err := m.apps.ListIncludeSpacesAll(ctx, client.NewAppListOptions())
 	if err != nil {
 		return []reader.Measurement{}, err
@@ -53,12 +59,14 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 	var readings = make([]reader.Measurement, len(apps))
 
 	// Aggregate process usage info by app.
+	m.logger.DebugContext(ctx, "app meter: aggregating process usage")
 	appUsage := make(map[string]int, len(apps))
 	for _, proc := range procs {
 		usage := proc.Instances * proc.MemoryInMB
 		appUsage[proc.Relationships.App.Data.GUID] += usage
 	}
 
+	m.logger.DebugContext(ctx, "app meter: aggregating app usage")
 	for i, app := range apps {
 		if app.State != appStateStarted {
 			// Only STARTED apps consume resources. Skip the rest.

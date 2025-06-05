@@ -23,24 +23,28 @@ func Routes(logger *slog.Logger, cf *client.Client) http.Handler {
 
 // First draft. Later, this will be a scheduled background job.
 func handleMeter(logger *slog.Logger, cf *client.Client) http.HandlerFunc {
+	logger.Debug("meter: initializing meters")
 	meters := []reader.Meter{
-		meter.NewCFServiceMeter(cf.ServiceInstances, cf.Spaces),
-		meter.NewCFAppMeter(cf.Applications, cf.Processes),
+		meter.NewCFServiceMeter(logger, cf.ServiceInstances, cf.Spaces),
+		meter.NewCFAppMeter(logger, cf.Applications, cf.Processes),
 	}
 	reader := reader.New(meters)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		readings, err := reader.Read(r.Context())
+		ctx := r.Context()
+		logger.DebugContext(ctx, "meter: reading usage information")
+		readings, err := reader.Read(ctx)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		logger.DebugContext(ctx, "meter: marshalling JSON")
 		b, err := json.Marshal(readings)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		logger.DebugContext(ctx, "meter: writing response bytes")
 		_, err = w.Write(b)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
