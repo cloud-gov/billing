@@ -13,8 +13,11 @@ build: gen
 test: gen
 	go test ./...
 
+watchgen:
+	find . | grep ".sql" | entr make gen
+
 watch:
-	find . | grep -E "\.go|\.sql" | entr -r "make gen && go run ."
+	find . | grep ".go" | entr -r go run .
 
 clean: db-down
 	go clean
