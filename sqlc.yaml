@@ -4,12 +4,16 @@ servers:
     uri: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 sql:
   - engine: "postgresql"
-    queries: "sql/queries/query.sql"
+    queries: "sql/queries"
     schema: "sql/schema/schema.sql"
     gen:
       go:
+        emit_interface: true
         package: "db"
         out: "internal/db"
+        rename:
+          cf_org: "CFOrg"
+          cf_org_id: "CFOrgID"
     database:
       managed: true
     rules:
