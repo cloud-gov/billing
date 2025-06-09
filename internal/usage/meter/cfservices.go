@@ -47,6 +47,7 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 		return nil, err
 	}
 
+	m.logger.DebugContext(ctx, "service meter: listing spaces")
 	spaceopts := client.NewSpaceListOptions()
 	spaces, err := m.spaces.ListAll(ctx, spaceopts)
 	if err != nil {
