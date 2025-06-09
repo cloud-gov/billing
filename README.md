@@ -4,6 +4,15 @@ Under development.
 
 ## Development
 
+Most development tasks can be achieved using the Make targets defined in [Makefile](./Makefile).
+
+```sh
+make watch # Watch .sql and .go files for changes. On change, regenerate go files, recompile, and start the server.
+make clean # Shut down the database if it is running and clean binary artifacts.
+```
+
+## Packages
+
 The program has the following structure:
 
 ```
