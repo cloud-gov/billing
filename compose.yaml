@@ -1,0 +1,18 @@
+# For use with local development only.
+# From postgres Docker README: https://github.com/docker-library/docs/blob/master/postgres/README.md#-via-docker-compose
+services:
+  db:
+    image: postgres:15
+    restart: always
+    shm_size: 128mb
+    # networks:
+    #   - host
+    ports:
+      - 5432:5432
+    volumes:
+      - type: tmpfs
+        target: /dev/shm
+        tmpfs:
+          size: 134217728 # 128*2^20 bytes = 128Mb
+    environment:
+      POSTGRES_PASSWORD: postgres
