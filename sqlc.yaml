@@ -5,7 +5,7 @@ servers:
 sql:
   - engine: "postgresql"
     queries: "sql/queries"
-    schema: "sql/schema/schema.sql"
+    schema: "sql/migrations"
     gen:
       go:
         emit_interface: true

@@ -31,7 +31,7 @@ CREATE TABLE resource_kind (
   meter TEXT NOT NULL,
   natural_id TEXT,
   credits INT,
-  amount INT, 
+  amount INT,
   unit_of_measure text NOT NULL,
 
   PRIMARY KEY (meter, natural_id),
