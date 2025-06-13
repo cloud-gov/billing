@@ -33,6 +33,7 @@ watchgen:
 .PHONY: watch
 watch:
 	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
+	@set -a; source docker.env; set +a;
 	@while true; do \
 		find . -type f -name '*.go' | entr -d -r go run . ; \
 		sleep 0.5 ; \
@@ -42,6 +43,12 @@ watch:
 clean: db-down
 	go clean
 
-.PHONY: tern
-tern:
-	go tool tern
+.PHONY: db-init
+db-init:
+	@# Initialize the database.
+	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+
+.PHONY: migrate
+migrate: db-init
+	@# Migrate to the latest migration.
+	@set -a; source docker.env; set +a; go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
