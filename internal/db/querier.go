@@ -7,24 +7,27 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
+	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
 	CreateResource(ctx context.Context, arg CreateResourceParams) (Resource, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
-	DeleteCFOrg(ctx context.Context, id uuid.UUID) error
+	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
 	DeleteResource(ctx context.Context, id int32) error
-	DeleteResourceKind(ctx context.Context, id int32) error
+	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
-	GetCFOrg(ctx context.Context, id uuid.UUID) (CFOrg, error)
+	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResource(ctx context.Context, id int32) (Resource, error)
-	GetResourceKind(ctx context.Context, id int32) (ResourceKind, error)
+	GetResourceByNaturalID(ctx context.Context, arg GetResourceByNaturalIDParams) (Resource, error)
+	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)

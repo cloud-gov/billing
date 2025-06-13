@@ -8,7 +8,7 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCFOrg = `-- name: CreateCFOrg :one
@@ -29,7 +29,7 @@ type CreateCFOrgParams struct {
 }
 
 func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
-	row := q.db.QueryRowContext(ctx, createCFOrg,
+	row := q.db.QueryRow(ctx, createCFOrg,
 		arg.Name,
 		arg.TierID,
 		arg.CreditsQuota,
@@ -53,8 +53,8 @@ DELETE FROM cf_org
 WHERE id = $1
 `
 
-func (q *Queries) DeleteCFOrg(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteCFOrg, id)
+func (q *Queries) DeleteCFOrg(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCFOrg, id)
 	return err
 }
 
@@ -63,8 +63,8 @@ SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetCFOrg(ctx context.Context, id uuid.UUID) (CFOrg, error) {
-	row := q.db.QueryRowContext(ctx, getCFOrg, id)
+func (q *Queries) GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
+	row := q.db.QueryRow(ctx, getCFOrg, id)
 	var i CFOrg
 	err := row.Scan(
 		&i.ID,
@@ -83,7 +83,7 @@ ORDER BY name
 `
 
 func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
-	rows, err := q.db.QueryContext(ctx, listCFOrgs)
+	rows, err := q.db.Query(ctx, listCFOrgs)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +103,6 @@ func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -122,7 +119,7 @@ WHERE id = $1
 `
 
 type UpdateCFOrgParams struct {
-	ID           uuid.UUID
+	ID           pgtype.UUID
 	Name         string
 	TierID       int32
 	CreditsQuota int64
@@ -130,7 +127,7 @@ type UpdateCFOrgParams struct {
 }
 
 func (q *Queries) UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error {
-	_, err := q.db.ExecContext(ctx, updateCFOrg,
+	_, err := q.db.Exec(ctx, updateCFOrg,
 		arg.ID,
 		arg.Name,
 		arg.TierID,

@@ -29,7 +29,6 @@ type CFAppClient interface {
 
 type CFAppMeter struct {
 	logger *slog.Logger
-	name   string
 
 	apps      CFAppClient
 	processes CFProcessClient
@@ -38,10 +37,13 @@ type CFAppMeter struct {
 func NewCFAppMeter(logger *slog.Logger, apps CFAppClient, processes CFProcessClient) *CFAppMeter {
 	return &CFAppMeter{
 		logger:    logger.WithGroup("CFAppMeter"),
-		name:      "cfapps",
 		apps:      apps,
 		processes: processes,
 	}
+}
+
+func (m *CFAppMeter) Name() string {
+	return "cfapps"
 }
 
 func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
@@ -56,7 +58,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 		return []reader.Measurement{}, err
 	}
 
-	var readings = make([]reader.Measurement, len(apps))
+	var measurements = make([]reader.Measurement, len(apps))
 
 	// Aggregate process usage info by app.
 	m.logger.DebugContext(ctx, "app meter: aggregating process usage")
@@ -73,6 +75,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 			continue
 		}
 		m := reader.Measurement{
+			Meter:             m.Name(),
 			ResourceNaturalID: app.GUID,
 			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
 		}
@@ -87,8 +90,8 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 			m.OrgID = orgGUID
 		}
 
-		readings[i] = m
+		measurements[i] = m
 	}
 
-	return readings, nil
+	return measurements, nil
 }

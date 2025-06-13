@@ -11,6 +11,7 @@ import (
 	"github.com/cloudfoundry/go-cfclient/v3/config"
 
 	"github.com/cloud-gov/billing/internal/api"
+	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/server"
 )
 
@@ -34,10 +35,10 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// db := db.NewMockDB()
+	q := db.New(nil) // TODO
 	// logger.Info("running with in-memory mock database")
 
-	srv := server.New("", "8080", api.Routes(logger, cfclient), logger)
+	srv := server.New("", "8080", api.Routes(logger, cfclient, q), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }

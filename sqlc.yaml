@@ -10,6 +10,7 @@ sql:
       go:
         emit_interface: true
         package: "db"
+        sql_package: "pgx/v5"
         out: "internal/db"
         rename:
           cf_org: "CFOrg"

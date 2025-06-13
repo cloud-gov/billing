@@ -62,7 +62,7 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	if r.ResourceNaturalID != instanceID {
 		t.Fatal("instance ID did not match")
 	}
-	if r.ResourceKindNaturalID != planID {
+	if *r.ResourceKindNaturalID != planID {
 		t.Fatal("plan ID did not match")
 	}
 }

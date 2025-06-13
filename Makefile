@@ -8,9 +8,9 @@ db-down:
 
 .PHONY: gen
 gen: db-up
-	# sqlc does not remove generated files on its own when the source file is deleted.
-	# Do it manually here.
-	rm internal/db/*
+	@# sqlc does not remove generated files on its own when the source file is deleted; remove them manually here. (|| true reports success even when no files were found.)
+	@rm internal/db/* || true
+	@date
 	go generate ./...
 
 .PHONY: build
@@ -23,19 +23,16 @@ test: gen
 
 .PHONY: watchgen
 watchgen:
-	@echo "Watching for .sql file changes. Press ctrl+c *twice* to exit."
+	@echo "Watching for .sql file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		find . -type f -name '*.sql' | entr -d make gen ; \
 		sleep 0.5 ; \
 	done
 
-
-	find . | grep -E ".sql$$" | entr make gen
-
 # Run entr in a while loop because it exits when files are deleted..
 .PHONY: watch
 watch:
-	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit."
+	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		find . -type f -name '*.go' | entr -d -r go run . ; \
 		sleep 0.5 ; \
@@ -44,3 +41,7 @@ watch:
 .PHONY: clean
 clean: db-down
 	go clean
+
+.PHONY: tern
+tern:
+	go tool tern

@@ -10,7 +10,7 @@ CREATE TABLE tier (
 );
 
 CREATE TABLE cf_org (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY, -- TODO, natural_id instead, since it's defined by CF?
   name TEXT NOT NULL,
   tier_id INT NOT NULL,
   credits_quota BIGINT NOT NULL,
@@ -20,23 +20,33 @@ CREATE TABLE cf_org (
   CONSTRAINT fk_tier_id Foreign Key (tier_id) REFERENCES tier(id)
 );
 
+-- A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
+CREATE TABLE meter (
+  name TEXT NOT NULL CHECK (char_length(trim(name)) > 0) UNIQUE
+);
+
 -- Resource type
+-- Note that natural_id is nullable because some meters may only read one kind of resource, and that resource may not have a unique identifier in the target system.
 CREATE TABLE resource_kind (
-  id SERIAL PRIMARY KEY,
+  meter TEXT NOT NULL,
   natural_id TEXT,
   credits INT,
   amount INT, 
-  unit_of_measure text NOT NULL
+  unit_of_measure text NOT NULL,
+
+  PRIMARY KEY (meter, natural_id),
+  CONSTRAINT fk_meter Foreign Key (meter) REFERENCES meter(name)
 );
 
 -- Instance of resource
 CREATE TABLE resource (
   id SERIAL PRIMARY KEY,
-  natural_id TEXT,
-  kind_id INT NOT NULL,
+  natural_id TEXT NOT NULL,
+  meter TEXT NOT NULL,
+  kind_natural_id TEXT,
   cf_org_id UUID NOT NULL,
   CONSTRAINT fk_cf_org_id Foreign Key (cf_org_id) REFERENCES cf_org(id),
-  CONSTRAINT fk_cf_kind_id Foreign Key (kind_id) REFERENCES resource_kind(id)
+  CONSTRAINT fk_cf_kind_id Foreign Key (meter, kind_natural_id) REFERENCES resource_kind(meter, natural_id)
 );
 
 CREATE TABLE reading (

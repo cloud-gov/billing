@@ -7,33 +7,39 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createResource = `-- name: CreateResource :one
 INSERT INTO resource (
-  natural_id, kind_id, cf_org_id
+  natural_id, meter, kind_natural_id, cf_org_id
 ) VALUES (
-  $1, $2, $3
+  $1, $2, $3, $4
 )
-RETURNING id, natural_id, kind_id, cf_org_id
+RETURNING id, natural_id, meter, kind_natural_id, cf_org_id
 `
 
 type CreateResourceParams struct {
-	NaturalID sql.NullString
-	KindID    int32
-	CFOrgID   uuid.UUID
+	NaturalID     string
+	Meter         string
+	KindNaturalID pgtype.Text
+	CFOrgID       pgtype.UUID
 }
 
 func (q *Queries) CreateResource(ctx context.Context, arg CreateResourceParams) (Resource, error) {
-	row := q.db.QueryRowContext(ctx, createResource, arg.NaturalID, arg.KindID, arg.CFOrgID)
+	row := q.db.QueryRow(ctx, createResource,
+		arg.NaturalID,
+		arg.Meter,
+		arg.KindNaturalID,
+		arg.CFOrgID,
+	)
 	var i Resource
 	err := row.Scan(
 		&i.ID,
 		&i.NaturalID,
-		&i.KindID,
+		&i.Meter,
+		&i.KindNaturalID,
 		&i.CFOrgID,
 	)
 	return i, err
@@ -45,34 +51,58 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteResource(ctx context.Context, id int32) error {
-	_, err := q.db.ExecContext(ctx, deleteResource, id)
+	_, err := q.db.Exec(ctx, deleteResource, id)
 	return err
 }
 
 const getResource = `-- name: GetResource :one
-SELECT id, natural_id, kind_id, cf_org_id FROM resource
+SELECT id, natural_id, meter, kind_natural_id, cf_org_id FROM resource
 WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetResource(ctx context.Context, id int32) (Resource, error) {
-	row := q.db.QueryRowContext(ctx, getResource, id)
+	row := q.db.QueryRow(ctx, getResource, id)
 	var i Resource
 	err := row.Scan(
 		&i.ID,
 		&i.NaturalID,
-		&i.KindID,
+		&i.Meter,
+		&i.KindNaturalID,
+		&i.CFOrgID,
+	)
+	return i, err
+}
+
+const getResourceByNaturalID = `-- name: GetResourceByNaturalID :one
+SELECT id, natural_id, meter, kind_natural_id, cf_org_id FROM resource
+WHERE meter = $1 AND natural_id = $2 LIMIT 1
+`
+
+type GetResourceByNaturalIDParams struct {
+	Meter     string
+	NaturalID string
+}
+
+func (q *Queries) GetResourceByNaturalID(ctx context.Context, arg GetResourceByNaturalIDParams) (Resource, error) {
+	row := q.db.QueryRow(ctx, getResourceByNaturalID, arg.Meter, arg.NaturalID)
+	var i Resource
+	err := row.Scan(
+		&i.ID,
+		&i.NaturalID,
+		&i.Meter,
+		&i.KindNaturalID,
 		&i.CFOrgID,
 	)
 	return i, err
 }
 
 const listResources = `-- name: ListResources :many
-SELECT id, natural_id, kind_id, cf_org_id FROM resource
+SELECT id, natural_id, meter, kind_natural_id, cf_org_id FROM resource
 ORDER BY natural_id
 `
 
 func (q *Queries) ListResources(ctx context.Context) ([]Resource, error) {
-	rows, err := q.db.QueryContext(ctx, listResources)
+	rows, err := q.db.Query(ctx, listResources)
 	if err != nil {
 		return nil, err
 	}
@@ -83,15 +113,13 @@ func (q *Queries) ListResources(ctx context.Context) ([]Resource, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.NaturalID,
-			&i.KindID,
+			&i.Meter,
+			&i.KindNaturalID,
 			&i.CFOrgID,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -101,24 +129,27 @@ func (q *Queries) ListResources(ctx context.Context) ([]Resource, error) {
 
 const updateResource = `-- name: UpdateResource :exec
 UPDATE resource
-  set natural_id = $2,
-  kind_id = $3,
-  cf_org_id = $4
+  set meter = $2,
+  natural_id = $3,
+  kind_natural_id = $4,
+  cf_org_id = $5
   WHERE id = $1
 `
 
 type UpdateResourceParams struct {
-	ID        int32
-	NaturalID sql.NullString
-	KindID    int32
-	CFOrgID   uuid.UUID
+	ID            int32
+	Meter         string
+	NaturalID     string
+	KindNaturalID pgtype.Text
+	CFOrgID       pgtype.UUID
 }
 
 func (q *Queries) UpdateResource(ctx context.Context, arg UpdateResourceParams) error {
-	_, err := q.db.ExecContext(ctx, updateResource,
+	_, err := q.db.Exec(ctx, updateResource,
 		arg.ID,
+		arg.Meter,
 		arg.NaturalID,
-		arg.KindID,
+		arg.KindNaturalID,
 		arg.CFOrgID,
 	)
 	return err

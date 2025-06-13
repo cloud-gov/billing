@@ -5,14 +5,11 @@
 package db
 
 import (
-	"database/sql"
-	"time"
-
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type CFOrg struct {
-	ID           uuid.UUID
+	ID           pgtype.UUID
 	Name         string
 	TierID       int32
 	CreditsQuota int64
@@ -31,23 +28,28 @@ type Measurement struct {
 	Value      int32
 }
 
+type Meter struct {
+	Name string
+}
+
 type Reading struct {
 	ID        int32
-	CreatedAt time.Time
+	CreatedAt pgtype.Timestamp
 }
 
 type Resource struct {
-	ID        int32
-	NaturalID sql.NullString
-	KindID    int32
-	CFOrgID   uuid.UUID
+	ID            int32
+	NaturalID     string
+	Meter         string
+	KindNaturalID pgtype.Text
+	CFOrgID       pgtype.UUID
 }
 
 type ResourceKind struct {
-	ID            int32
-	NaturalID     sql.NullString
-	Credits       sql.NullInt32
-	Amount        sql.NullInt32
+	Meter         string
+	NaturalID     string
+	Credits       pgtype.Int4
+	Amount        pgtype.Int4
 	UnitOfMeasure string
 }
 
