@@ -22,7 +22,6 @@ sql/      # Source SQL for sqlc to convert into Go.
   schema/
 internal/ # All non-exported Go code for the service.
   api/    # The HTTP API surface of the application.
-  cf/     # Code specifically for interacting with Cloud Foundry.
   db/     # Destination directory for sqlc-generated Go code.
   server/ # Code for managing the web server lifecycle.
   usage/  # Code for reading usage information from Cloud.gov systems.
