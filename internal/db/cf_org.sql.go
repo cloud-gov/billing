@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkCreateCFOrgs = `-- name: BulkCreateCFOrgs :exec
+INSERT INTO cf_org (id)
+SELECT DISTINCT id
+FROM UNNEST($1::uuid[]) AS id
+ON CONFLICT DO NOTHING
+`
+
+// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, bulkCreateCFOrgs, ids)
+	return err
+}
+
 const createCFOrg = `-- name: CreateCFOrg :one
 INSERT INTO cf_org (
   name, tier_id, credits_quota, credits_used, customer_id
@@ -21,11 +34,11 @@ RETURNING id, name, tier_id, credits_quota, credits_used, customer_id
 `
 
 type CreateCFOrgParams struct {
-	Name         string
-	TierID       int32
-	CreditsQuota int64
-	CreditsUsed  int64
-	CustomerID   int64
+	Name         pgtype.Text
+	TierID       pgtype.Int4
+	CreditsQuota pgtype.Int8
+	CreditsUsed  pgtype.Int8
+	CustomerID   pgtype.Int8
 }
 
 func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
@@ -120,10 +133,10 @@ WHERE id = $1
 
 type UpdateCFOrgParams struct {
 	ID           pgtype.UUID
-	Name         string
-	TierID       int32
-	CreditsQuota int64
-	CreditsUsed  int64
+	Name         pgtype.Text
+	TierID       pgtype.Int4
+	CreditsQuota pgtype.Int8
+	CreditsUsed  pgtype.Int8
 }
 
 func (q *Queries) UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error {

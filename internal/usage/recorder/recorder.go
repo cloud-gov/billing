@@ -2,8 +2,8 @@ package recorder
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -13,68 +13,81 @@ import (
 )
 
 // RecordReading saves a reading to the database.
-func RecordReading(ctx context.Context, q db.Querier, r reader.Reading) error {
+func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading) error {
+	logger.Debug("creating reading in database")
 	dbReading, err := q.CreateReading(ctx, pgxTimestamp(r.Time))
 	if err != nil {
 		return err
 	}
 
-	// todo COPY for resources
-	dbMeasurements := make([]db.CreateMeasurementsParams, len(r.Measurements))
-	for i, m := range r.Measurements {
-		resource, err := q.GetResourceByNaturalID(ctx, db.GetResourceByNaturalIDParams{
-			Meter:     m.Meter,
-			NaturalID: m.ResourceNaturalID,
-		})
-		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				// Unexpected error.
-				// todo, make sure errors.Is works here.
-				return err
-			}
-			// If row is missing, insert it.
-			resource, err = q.CreateResource(ctx, db.CreateResourceParams{
-				NaturalID:     m.ResourceNaturalID,
-				Meter:         m.Meter,
-				KindNaturalID: pgxText(m.ResourceKindNaturalID),
-				CFOrgID:       pgxUUID(m.OrgID),
-			})
-			if err != nil {
-				return err // TODO, better handling
-			}
+	dbMeters := []string{}
+	dbCFOrgs := []pgtype.UUID{}
+	dbKinds := db.BulkCreateResourceKindsParams{}
+	dbResources := db.BulkCreateResourcesParams{}
+	dbMeasurements := db.BulkCreateMeasurementParams{}
+
+	discard := 0
+
+	for _, m := range r.Measurements {
+		if m.Meter == "" && m.ResourceNaturalID == "" {
+			// Empty measurements will make our database code fail. Discard them.
+			discard++
+			continue
 		}
 
-		dbMeasurements[i] = db.CreateMeasurementsParams{
-			ReadingID:  dbReading.ID,
-			ResourceID: resource.ID,
-			Value:      int32(m.Value),
-		}
+		// We may insert thousands of rows at a time. We only want to insert if a row does not already exist. COPY does not support ON CONFLICT, running an INSERT in a loop is inefficient, and sqlc does not support variable-length INSERTs. As a workaround we write INSERT queries that accept arrays, with one array per column where appropriate.
+		dbMeters = append(dbMeters, m.Meter)
+		dbCFOrgs = append(dbCFOrgs, pgxUUID(m.OrgID))
+		dbKinds.Meters = append(dbKinds.Meters, m.Meter)
+		dbKinds.NaturalIds = append(dbKinds.NaturalIds, m.ResourceKindNaturalID)
+		dbResources.CfOrgIds = append(dbResources.CfOrgIds, pgxUUID(m.OrgID))
+		dbResources.KindNaturalIds = append(dbResources.KindNaturalIds, m.ResourceKindNaturalID)
+		dbResources.Meters = append(dbResources.Meters, m.Meter)
+		dbResources.NaturalIds = append(dbResources.NaturalIds, m.ResourceNaturalID)
+		dbMeasurements.Meter = append(dbMeasurements.Meter, m.Meter)
+		dbMeasurements.ReadingID = append(dbMeasurements.ReadingID, dbReading.ID)
+		dbMeasurements.ResourceNaturalID = append(dbMeasurements.ResourceNaturalID, m.ResourceNaturalID)
+		dbMeasurements.Value = append(dbMeasurements.Value, int32(m.Value))
 	}
-	_, err = q.CreateMeasurements(ctx, []db.CreateMeasurementsParams{})
+	if discard > 0 {
+		logger.Warn(fmt.Sprintf("discarded %v empty measurements; a meter is returning empty data", discard))
+	}
+
+	logger.Debug("creating meters in database")
+	err = q.BulkCreateMeters(ctx, dbMeters)
 	if err != nil {
 		return err
 	}
+	logger.Debug("creating orgs in database")
+	err = q.BulkCreateCFOrgs(ctx, dbCFOrgs)
+	if err != nil {
+		return err
+	}
+	logger.Debug("creating resource kinds in database")
+	err = q.BulkCreateResourceKinds(ctx, dbKinds)
+	if err != nil {
+		return err
+	}
+	logger.Debug("creating resources in database")
+	err = q.BulkCreateResources(ctx, dbResources)
+	if err != nil {
+		return err
+	}
+	logger.Debug("creating measurements in database")
 
-	return nil
+	// TODO: For some reason, using q.CreateMeasurements, which is implemented with a COPY, does not work here. It works fine for /usage/app/{guid}.
+	err = q.BulkCreateMeasurement(ctx, dbMeasurements)
+	if err != nil {
+		return err
+	}
+	logger.Debug("created measurements")
+	return err
 }
 
 func pgxUUID(s string) pgtype.UUID {
 	u := pgtype.UUID{}
-	if len(s) > 16 {
-		return u
-	}
-	copy(u.Bytes[:], s)
+	u.Scan(s)
 	return u
-}
-
-func pgxText(s *string) pgtype.Text {
-	str := pgtype.Text{
-		Valid: s != nil,
-	}
-	if s != nil {
-		str.String = *s
-	}
-	return str
 }
 
 func pgxTimestamp(t time.Time) pgtype.Timestamp {

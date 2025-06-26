@@ -5,8 +5,45 @@
 
 package db
 
+import (
+	"context"
+)
+
+const bulkCreateMeasurement = `-- name: BulkCreateMeasurement :exec
+INSERT INTO measurement (
+	reading_id,
+	meter,
+	resource_natural_id,
+	value
+) SELECT reading_id, meter, resource_natural_id, value FROM
+UNNEST (
+	$1::int[],
+	$2::text[],
+	$3::text[],
+	$4::int[]
+) AS m(reading_id, meter, resource_natural_id, value)
+`
+
+type BulkCreateMeasurementParams struct {
+	ReadingID         []int32
+	Meter             []string
+	ResourceNaturalID []string
+	Value             []int32
+}
+
+func (q *Queries) BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error {
+	_, err := q.db.Exec(ctx, bulkCreateMeasurement,
+		arg.ReadingID,
+		arg.Meter,
+		arg.ResourceNaturalID,
+		arg.Value,
+	)
+	return err
+}
+
 type CreateMeasurementsParams struct {
-	ReadingID  int32
-	ResourceID int32
-	Value      int32
+	ReadingID         int32
+	Meter             string
+	ResourceNaturalID string
+	Value             int32
 }

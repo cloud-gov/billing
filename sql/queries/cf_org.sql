@@ -25,3 +25,10 @@ INSERT INTO cf_org (
   $1, $2, $3, $4, $5
 )
 RETURNING *;
+
+-- name: BulkCreateCFOrgs :exec
+-- BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+INSERT INTO cf_org (id)
+SELECT DISTINCT id
+FROM UNNEST(sqlc.arg(ids)::uuid[]) AS id
+ON CONFLICT DO NOTHING;

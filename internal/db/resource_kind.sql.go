@@ -11,6 +11,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkCreateResourceKinds = `-- name: BulkCreateResourceKinds :exec
+INSERT INTO resource_kind (meter, natural_id)
+SELECT DISTINCT ON (r.meter, r.natural_id) meter, natural_id
+FROM
+  UNNEST(
+    $1::text[],
+    $2::text[]
+  ) AS r(meter, natural_id)
+ON CONFLICT (meter, natural_id) DO NOTHING
+`
+
+type BulkCreateResourceKindsParams struct {
+	Meters     []string
+	NaturalIds []string
+}
+
+// BulkCreateResourceKinds creates ResourceKind rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
+func (q *Queries) BulkCreateResourceKinds(ctx context.Context, arg BulkCreateResourceKindsParams) error {
+	_, err := q.db.Exec(ctx, bulkCreateResourceKinds, arg.Meters, arg.NaturalIds)
+	return err
+}
+
 const createResourceKind = `-- name: CreateResourceKind :one
 INSERT INTO resource_kind (
   meter, natural_id, credits, amount, unit_of_measure
@@ -25,7 +48,7 @@ type CreateResourceKindParams struct {
 	NaturalID     string
 	Credits       pgtype.Int4
 	Amount        pgtype.Int4
-	UnitOfMeasure string
+	UnitOfMeasure pgtype.Text
 }
 
 func (q *Queries) CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error) {
@@ -129,7 +152,7 @@ type UpdateResourceKindParams struct {
 	NaturalID     string
 	Credits       pgtype.Int4
 	Amount        pgtype.Int4
-	UnitOfMeasure string
+	UnitOfMeasure pgtype.Text
 }
 
 func (q *Queries) UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error {

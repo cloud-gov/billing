@@ -30,7 +30,8 @@ func (r *iteratorForCreateMeasurements) Next() bool {
 func (r iteratorForCreateMeasurements) Values() ([]interface{}, error) {
 	return []interface{}{
 		r.rows[0].ReadingID,
-		r.rows[0].ResourceID,
+		r.rows[0].Meter,
+		r.rows[0].ResourceNaturalID,
 		r.rows[0].Value,
 	}, nil
 }
@@ -40,5 +41,5 @@ func (r iteratorForCreateMeasurements) Err() error {
 }
 
 func (q *Queries) CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"measurement"}, []string{"reading_id", "resource_id", "value"}, &iteratorForCreateMeasurements{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"measurement"}, []string{"reading_id", "meter", "resource_natural_id", "value"}, &iteratorForCreateMeasurements{rows: arg})
 }

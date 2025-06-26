@@ -58,18 +58,18 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 		return []reader.Measurement{}, err
 	}
 
-	var measurements = make([]reader.Measurement, len(apps))
+	var measurements = []reader.Measurement{}
 
 	// Aggregate process usage info by app.
 	m.logger.DebugContext(ctx, "app meter: aggregating process usage")
-	appUsage := make(map[string]int, len(apps))
+	appUsage := map[string]int{}
 	for _, proc := range procs {
 		usage := proc.Instances * proc.MemoryInMB
 		appUsage[proc.Relationships.App.Data.GUID] += usage
 	}
 
 	m.logger.DebugContext(ctx, "app meter: aggregating app usage")
-	for i, app := range apps {
+	for _, app := range apps {
 		if app.State != appStateStarted {
 			// Only STARTED apps consume resources. Skip the rest.
 			continue
@@ -90,7 +90,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 			m.OrgID = orgGUID
 		}
 
-		measurements[i] = m
+		measurements = append(measurements, m)
 	}
 
 	return measurements, nil

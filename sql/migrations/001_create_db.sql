@@ -20,13 +20,11 @@ CREATE TABLE cf_org (
   CONSTRAINT fk_tier_id Foreign Key (tier_id) REFERENCES tier(id)
 );
 
--- A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
 CREATE TABLE meter (
   name TEXT NOT NULL CHECK (char_length(trim(name)) > 0) UNIQUE
 );
+COMMENT ON TABLE meter IS 'A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.';
 
--- Resource type
--- Note that natural_id is nullable because some meters may only read one kind of resource, and that resource may not have a unique identifier in the target system.
 CREATE TABLE resource_kind (
   meter TEXT NOT NULL,
   natural_id TEXT,
@@ -37,14 +35,15 @@ CREATE TABLE resource_kind (
   PRIMARY KEY (meter, natural_id),
   CONSTRAINT fk_meter Foreign Key (meter) REFERENCES meter(name)
 );
+COMMENT ON TABLE resource_kind IS 'ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.';
 
 -- Instance of resource
 CREATE TABLE resource (
-  id SERIAL PRIMARY KEY,
-  natural_id TEXT NOT NULL,
   meter TEXT NOT NULL,
+  natural_id TEXT NOT NULL,
   kind_natural_id TEXT,
   cf_org_id UUID NOT NULL,
+  PRIMARY KEY (meter, natural_id),
   CONSTRAINT fk_cf_org_id Foreign Key (cf_org_id) REFERENCES cf_org(id),
   CONSTRAINT fk_cf_kind_id Foreign Key (meter, kind_natural_id) REFERENCES resource_kind(meter, natural_id)
 );
@@ -56,8 +55,9 @@ CREATE TABLE reading (
 
 CREATE TABLE measurement (
   reading_id INT NOT NULL,
-  resource_id INT NOT NULL,
+  meter TEXT NOT NULL,
+  resource_natural_id TEXT NOT NULL,
   value INT NOT NULL,
   CONSTRAINT fk_reading_id Foreign Key (reading_id) REFERENCES reading(id),
-  CONSTRAINT fk_resource_id Foreign Key (resource_id) REFERENCES resource(id)
+  CONSTRAINT fk_resource_id Foreign Key (meter, resource_natural_id) REFERENCES resource(meter, natural_id)
 );
