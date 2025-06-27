@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12.0.20250605163211-41fbb9ee824a
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/go-chi/chi/v5 v5.2.2
 )
 
 require (
