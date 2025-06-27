@@ -31,7 +31,7 @@ func Routes(logger *slog.Logger, cf *client.Client, q db.Querier) http.Handler {
 func handleUsage(logger *slog.Logger, cf *client.Client, q db.Querier) http.HandlerFunc {
 	logger.Debug("api: initializing meters")
 	meters := []reader.Meter{
-		// meter.NewCFServiceMeter(logger, cf.ServiceInstances, cf.Spaces),
+		meter.NewCFServiceMeter(logger, cf.ServiceInstances, cf.Spaces),
 		meter.NewCFAppMeter(logger, cf.Applications, cf.Processes),
 	}
 	reader := reader.New(meters)
