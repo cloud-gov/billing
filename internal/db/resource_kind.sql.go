@@ -7,27 +7,53 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const bulkCreateResourceKinds = `-- name: BulkCreateResourceKinds :exec
+INSERT INTO resource_kind (meter, natural_id)
+SELECT DISTINCT ON (r.meter, r.natural_id) meter, natural_id
+FROM
+  UNNEST(
+    $1::text[],
+    $2::text[]
+  ) AS r(meter, natural_id)
+ON CONFLICT (meter, natural_id) DO NOTHING
+`
+
+type BulkCreateResourceKindsParams struct {
+	Meters     []string
+	NaturalIds []string
+}
+
+// BulkCreateResourceKinds creates ResourceKind rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
+func (q *Queries) BulkCreateResourceKinds(ctx context.Context, arg BulkCreateResourceKindsParams) error {
+	_, err := q.db.Exec(ctx, bulkCreateResourceKinds, arg.Meters, arg.NaturalIds)
+	return err
+}
 
 const createResourceKind = `-- name: CreateResourceKind :one
 INSERT INTO resource_kind (
-  natural_id, credits, amount, unit_of_measure
+  meter, natural_id, credits, amount, unit_of_measure
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
-RETURNING id, natural_id, credits, amount, unit_of_measure
+RETURNING meter, natural_id, credits, amount, unit_of_measure
 `
 
 type CreateResourceKindParams struct {
-	NaturalID     sql.NullString
-	Credits       sql.NullInt32
-	Amount        sql.NullInt32
-	UnitOfMeasure string
+	Meter         string
+	NaturalID     string
+	Credits       pgtype.Int4
+	Amount        pgtype.Int4
+	UnitOfMeasure pgtype.Text
 }
 
 func (q *Queries) CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error) {
-	row := q.db.QueryRowContext(ctx, createResourceKind,
+	row := q.db.QueryRow(ctx, createResourceKind,
+		arg.Meter,
 		arg.NaturalID,
 		arg.Credits,
 		arg.Amount,
@@ -35,7 +61,7 @@ func (q *Queries) CreateResourceKind(ctx context.Context, arg CreateResourceKind
 	)
 	var i ResourceKind
 	err := row.Scan(
-		&i.ID,
+		&i.Meter,
 		&i.NaturalID,
 		&i.Credits,
 		&i.Amount,
@@ -46,24 +72,34 @@ func (q *Queries) CreateResourceKind(ctx context.Context, arg CreateResourceKind
 
 const deleteResourceKind = `-- name: DeleteResourceKind :exec
 DELETE FROM resource_kind
-WHERE id = $1
+WHERE meter = $1 AND natural_id = $2
 `
 
-func (q *Queries) DeleteResourceKind(ctx context.Context, id int32) error {
-	_, err := q.db.ExecContext(ctx, deleteResourceKind, id)
+type DeleteResourceKindParams struct {
+	Meter     string
+	NaturalID string
+}
+
+func (q *Queries) DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error {
+	_, err := q.db.Exec(ctx, deleteResourceKind, arg.Meter, arg.NaturalID)
 	return err
 }
 
 const getResourceKind = `-- name: GetResourceKind :one
-SELECT id, natural_id, credits, amount, unit_of_measure FROM resource_kind
-WHERE id = $1 LIMIT 1
+SELECT meter, natural_id, credits, amount, unit_of_measure FROM resource_kind
+WHERE meter = $1 AND natural_id = $2 LIMIT 1
 `
 
-func (q *Queries) GetResourceKind(ctx context.Context, id int32) (ResourceKind, error) {
-	row := q.db.QueryRowContext(ctx, getResourceKind, id)
+type GetResourceKindParams struct {
+	Meter     string
+	NaturalID string
+}
+
+func (q *Queries) GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error) {
+	row := q.db.QueryRow(ctx, getResourceKind, arg.Meter, arg.NaturalID)
 	var i ResourceKind
 	err := row.Scan(
-		&i.ID,
+		&i.Meter,
 		&i.NaturalID,
 		&i.Credits,
 		&i.Amount,
@@ -73,12 +109,12 @@ func (q *Queries) GetResourceKind(ctx context.Context, id int32) (ResourceKind, 
 }
 
 const listResourceKind = `-- name: ListResourceKind :many
-SELECT id, natural_id, credits, amount, unit_of_measure FROM resource_kind
+SELECT meter, natural_id, credits, amount, unit_of_measure FROM resource_kind
 ORDER BY natural_id
 `
 
 func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) {
-	rows, err := q.db.QueryContext(ctx, listResourceKind)
+	rows, err := q.db.Query(ctx, listResourceKind)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +123,7 @@ func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) 
 	for rows.Next() {
 		var i ResourceKind
 		if err := rows.Scan(
-			&i.ID,
+			&i.Meter,
 			&i.NaturalID,
 			&i.Credits,
 			&i.Amount,
@@ -97,9 +133,6 @@ func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) 
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -108,24 +141,23 @@ func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) 
 
 const updateResourceKind = `-- name: UpdateResourceKind :exec
 UPDATE resource_kind
-  set natural_id = $2,
-  credits = $3,
+  set credits = $3,
   amount = $4,
   unit_of_measure = $5
-  WHERE id = $1
+  WHERE meter = $1 AND natural_id = $2
 `
 
 type UpdateResourceKindParams struct {
-	ID            int32
-	NaturalID     sql.NullString
-	Credits       sql.NullInt32
-	Amount        sql.NullInt32
-	UnitOfMeasure string
+	Meter         string
+	NaturalID     string
+	Credits       pgtype.Int4
+	Amount        pgtype.Int4
+	UnitOfMeasure pgtype.Text
 }
 
 func (q *Queries) UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error {
-	_, err := q.db.ExecContext(ctx, updateResourceKind,
-		arg.ID,
+	_, err := q.db.Exec(ctx, updateResourceKind,
+		arg.Meter,
 		arg.NaturalID,
 		arg.Credits,
 		arg.Amount,

@@ -24,7 +24,7 @@ type CreateTierParams struct {
 }
 
 func (q *Queries) CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error) {
-	row := q.db.QueryRowContext(ctx, createTier, arg.Name, arg.TierCredits)
+	row := q.db.QueryRow(ctx, createTier, arg.Name, arg.TierCredits)
 	var i Tier
 	err := row.Scan(&i.ID, &i.Name, &i.TierCredits)
 	return i, err
@@ -36,7 +36,7 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteTier(ctx context.Context, id int32) error {
-	_, err := q.db.ExecContext(ctx, deleteTier, id)
+	_, err := q.db.Exec(ctx, deleteTier, id)
 	return err
 }
 
@@ -46,7 +46,7 @@ WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetTier(ctx context.Context, id int32) (Tier, error) {
-	row := q.db.QueryRowContext(ctx, getTier, id)
+	row := q.db.QueryRow(ctx, getTier, id)
 	var i Tier
 	err := row.Scan(&i.ID, &i.Name, &i.TierCredits)
 	return i, err
@@ -58,7 +58,7 @@ ORDER BY name
 `
 
 func (q *Queries) ListTiers(ctx context.Context) ([]Tier, error) {
-	rows, err := q.db.QueryContext(ctx, listTiers)
+	rows, err := q.db.Query(ctx, listTiers)
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +70,6 @@ func (q *Queries) ListTiers(ctx context.Context) ([]Tier, error) {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -94,6 +91,6 @@ type UpdateTierParams struct {
 }
 
 func (q *Queries) UpdateTier(ctx context.Context, arg UpdateTierParams) error {
-	_, err := q.db.ExecContext(ctx, updateTier, arg.ID, arg.Name, arg.TierCredits)
+	_, err := q.db.Exec(ctx, updateTier, arg.ID, arg.Name, arg.TierCredits)
 	return err
 }

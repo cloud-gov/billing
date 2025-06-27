@@ -7,24 +7,36 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
+	BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error
+	// BulkCreateMeters creates Meter rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	BulkCreateMeters(ctx context.Context, names []string) error
+	// BulkCreateResourceKinds creates ResourceKind rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
+	BulkCreateResourceKinds(ctx context.Context, arg BulkCreateResourceKindsParams) error
+	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
+	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
 	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
-	CreateResource(ctx context.Context, arg CreateResourceParams) (Resource, error)
+	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
+	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
+	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
-	DeleteCFOrg(ctx context.Context, id uuid.UUID) error
+	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
-	DeleteResource(ctx context.Context, id int32) error
-	DeleteResourceKind(ctx context.Context, id int32) error
+	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
+	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
-	GetCFOrg(ctx context.Context, id uuid.UUID) (CFOrg, error)
+	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
-	GetResource(ctx context.Context, id int32) (Resource, error)
-	GetResourceKind(ctx context.Context, id int32) (ResourceKind, error)
+	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
@@ -36,6 +48,8 @@ type Querier interface {
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
+	// UpsertResource upserts a Resource and creates minimal rows in foreign tables -- namely meter, cf_org, and resource_kind -- to which Resource has foreign keys. Efficient for single inserts. For bulk inserts, review Bulk* functions.
+	UpsertResource(ctx context.Context, arg UpsertResourceParams) (Resource, error)
 }
 
 var _ Querier = (*Queries)(nil)
