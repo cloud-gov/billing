@@ -4,7 +4,7 @@
 
 ```mermaid
 ---
-title: "Figure 3: New Routes and Services"
+title: "Figure 1: New Routes and Services"
 ---
 
 flowchart LR
