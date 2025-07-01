@@ -48,18 +48,20 @@ clean: db-down
 
 .PHONY: db-init
 db-init:
-	@# Initialize the database.
+	@# Initialize all databases.
 	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 .PHONY: db-drop
 db-drop:
-	@# Drop the billing database. As written, assumes sql/init has only one migration.
-	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination -1
+	@# Drop all databases.
+	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
 
 .PHONY: migrate
 migrate: db-init
 	@# Migrate to the latest migration.
 	@set -a; source docker.env; set +a; go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@# Migrate River schema to latest.
+	@go tool river migrate-up
 
 .PHONY: db-reset
 db-reset: db-drop db-init migrate

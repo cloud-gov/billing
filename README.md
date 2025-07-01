@@ -32,21 +32,26 @@ Note that table name `schema_version` is reserved by tern for tracking migration
 
 - Postgres and AWS use their conventional environment variables for configuration. See [Postgres docs](https://www.postgresql.org/docs/current/libpq-envars.html) and [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html).
 
+### River Queue
+
+Billing service uses [River](https://riverqueue.com/docs) for transactional job queuing.
+
 ## Packages
 
 The program has the following structure:
 
 ```
-sql/      # Source SQL for sqlc to convert into Go.
-  migrations/
-  queries/
-internal/ # All non-exported Go code for the service.
-  api/    # The HTTP API surface of the application.
-  db/     # Destination directory for sqlc-generated Go code.
-  server/ # Code for managing the web server lifecycle.
-  usage/  # Code for reading usage information from Cloud.gov systems.
-gen.go    # Program-scope go:generate directives.
-main.go   # Entrypoint for the server program.
+sql/          # Source SQL for sqlc to convert into Go.
+  init/       # Database creation must be separate from migrations so Tern has something to connect to.
+  migrations/ # Schema for billing service tables.
+  queries/    # Queries for billing service tables.
+internal/     # All non-exported Go code for the service.
+  api/        # The HTTP API surface of the application.
+  db/         # Destination directory for sqlc-generated Go code.
+  server/     # Code for managing the web server lifecycle.
+  usage/      # Code for reading usage information from Cloud.gov systems.
+gen.go        # Program-scope go:generate directives.
+main.go       # Entrypoint for the server program.
 ```
 
 ### Notes
