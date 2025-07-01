@@ -8,20 +8,27 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
+	"time"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/jobs"
 	"github.com/cloud-gov/billing/internal/server"
 )
 
 var (
-	ErrCFConfig = errors.New("parsing Cloud Foundry connection configuration")
-	ErrCFClient = errors.New("creating Cloud Foundry client")
-	ErrDBConn   = errors.New("connecting to database")
+	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
+	ErrCFClient         = errors.New("creating Cloud Foundry client")
+	ErrDBConn           = errors.New("connecting to database")
+	ErrRiverClientNew   = errors.New("creating River client")
+	ErrRiverClientStart = errors.New("starting River client")
 )
 
 // run sets up dependencies, calls route registration, and starts the server.
@@ -33,7 +40,7 @@ func run(ctx context.Context, out io.Writer) error {
 	defer cancel()
 
 	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: slog.LevelInfo,
 	}))
 
 	cfconf, err := config.NewFromCFHome()
@@ -44,13 +51,38 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrCFClient, err)
 	}
-	conn, err := pgx.Connect(ctx, "") // Pass empty connString so PG* environment variables will be used.
+
+	conn, err := pgxpool.New(ctx, "") // Pass empty connString so PG* environment variables will be used.
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDBConn, err)
 	}
 	q := db.New(conn)
 
-	srv := server.New("", "8080", api.Routes(logger, cfclient, q), logger)
+	workers := river.NewWorkers()
+
+	usageWorker, err := jobs.NewMeasureUsageWorker(logger)
+	if err != nil {
+		return err
+	}
+	river.AddWorker(workers, usageWorker)
+
+	riverc, err := river.NewClient(riverpgxv5.New(conn), &river.Config{
+		JobTimeout: 10 * time.Minute,
+		Logger:     logger,
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: runtime.GOMAXPROCS(0)}, // Run as many workers as we have CPU cores available.
+		},
+		Workers: workers,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrRiverClientNew, err)
+	}
+
+	if err = riverc.Start(ctx); err != nil {
+		return fmt.Errorf("%w: %w", ErrRiverClientStart, err)
+	}
+
+	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }

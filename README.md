@@ -36,6 +36,12 @@ Note that table name `schema_version` is reserved by tern for tracking migration
 
 Billing service uses [River](https://riverqueue.com/docs) for transactional job queuing.
 
+Tips:
+
+- If you have to pass dependencies to a River worker, create a `NewXYZWorker` function that accepts those dependencies and sets them as private package vars. Do not pass dependencies as job args.
+  - River job args are serialized to JSON, stored in the database, and deserialized to be run; dependencies like API clients and loggers may not fully serialize their internal state, resulting in nil pointer panics when they are unmarshalled and used.
+  - Additionally, dependencies may have sensitive internal information that should not be persisted to the database.
+
 ## Packages
 
 The program has the following structure:
