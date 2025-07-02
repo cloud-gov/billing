@@ -8,8 +8,21 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const bulkCreateCFOrgs = `-- name: BulkCreateCFOrgs :exec
+INSERT INTO cf_org (id)
+SELECT DISTINCT id
+FROM UNNEST($1::uuid[]) AS id
+ON CONFLICT DO NOTHING
+`
+
+// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, bulkCreateCFOrgs, ids)
+	return err
+}
 
 const createCFOrg = `-- name: CreateCFOrg :one
 INSERT INTO cf_org (
@@ -21,15 +34,15 @@ RETURNING id, name, tier_id, credits_quota, credits_used, customer_id
 `
 
 type CreateCFOrgParams struct {
-	Name         string
-	TierID       int32
-	CreditsQuota int64
-	CreditsUsed  int64
-	CustomerID   int64
+	Name         pgtype.Text
+	TierID       pgtype.Int4
+	CreditsQuota pgtype.Int8
+	CreditsUsed  pgtype.Int8
+	CustomerID   pgtype.Int8
 }
 
 func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
-	row := q.db.QueryRowContext(ctx, createCFOrg,
+	row := q.db.QueryRow(ctx, createCFOrg,
 		arg.Name,
 		arg.TierID,
 		arg.CreditsQuota,
@@ -53,8 +66,8 @@ DELETE FROM cf_org
 WHERE id = $1
 `
 
-func (q *Queries) DeleteCFOrg(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteCFOrg, id)
+func (q *Queries) DeleteCFOrg(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCFOrg, id)
 	return err
 }
 
@@ -63,8 +76,8 @@ SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetCFOrg(ctx context.Context, id uuid.UUID) (CFOrg, error) {
-	row := q.db.QueryRowContext(ctx, getCFOrg, id)
+func (q *Queries) GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
+	row := q.db.QueryRow(ctx, getCFOrg, id)
 	var i CFOrg
 	err := row.Scan(
 		&i.ID,
@@ -83,7 +96,7 @@ ORDER BY name
 `
 
 func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
-	rows, err := q.db.QueryContext(ctx, listCFOrgs)
+	rows, err := q.db.Query(ctx, listCFOrgs)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +116,6 @@ func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -122,15 +132,15 @@ WHERE id = $1
 `
 
 type UpdateCFOrgParams struct {
-	ID           uuid.UUID
-	Name         string
-	TierID       int32
-	CreditsQuota int64
-	CreditsUsed  int64
+	ID           pgtype.UUID
+	Name         pgtype.Text
+	TierID       pgtype.Int4
+	CreditsQuota pgtype.Int8
+	CreditsUsed  pgtype.Int8
 }
 
 func (q *Queries) UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error {
-	_, err := q.db.ExecContext(ctx, updateCFOrg,
+	_, err := q.db.Exec(ctx, updateCFOrg,
 		arg.ID,
 		arg.Name,
 		arg.TierID,

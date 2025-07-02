@@ -24,7 +24,7 @@ type CreateCustomerParams struct {
 }
 
 func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
-	row := q.db.QueryRowContext(ctx, createCustomer, arg.ID, arg.Name)
+	row := q.db.QueryRow(ctx, createCustomer, arg.ID, arg.Name)
 	var i Customer
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
@@ -36,7 +36,7 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteCustomer(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteCustomer, id)
+	_, err := q.db.Exec(ctx, deleteCustomer, id)
 	return err
 }
 
@@ -46,7 +46,7 @@ WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetCustomer(ctx context.Context, id int64) (Customer, error) {
-	row := q.db.QueryRowContext(ctx, getCustomer, id)
+	row := q.db.QueryRow(ctx, getCustomer, id)
 	var i Customer
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
@@ -58,7 +58,7 @@ ORDER BY name
 `
 
 func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
-	rows, err := q.db.QueryContext(ctx, listCustomers)
+	rows, err := q.db.Query(ctx, listCustomers)
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +70,6 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -92,6 +89,6 @@ type UpdateCustomerParams struct {
 }
 
 func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error {
-	_, err := q.db.ExecContext(ctx, updateCustomer, arg.ID, arg.Name)
+	_, err := q.db.Exec(ctx, updateCustomer, arg.ID, arg.Name)
 	return err
 }

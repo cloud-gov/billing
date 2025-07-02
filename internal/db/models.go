@@ -5,19 +5,16 @@
 package db
 
 import (
-	"database/sql"
-	"time"
-
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type CFOrg struct {
-	ID           uuid.UUID
-	Name         string
-	TierID       int32
-	CreditsQuota int64
-	CreditsUsed  int64
-	CustomerID   int64
+	ID           pgtype.UUID
+	Name         pgtype.Text
+	TierID       pgtype.Int4
+	CreditsQuota pgtype.Int8
+	CreditsUsed  pgtype.Int8
+	CustomerID   pgtype.Int8
 }
 
 type Customer struct {
@@ -26,29 +23,36 @@ type Customer struct {
 }
 
 type Measurement struct {
-	ReadingID  int32
-	ResourceID int32
-	Value      int32
+	ReadingID         int32
+	Meter             string
+	ResourceNaturalID string
+	Value             int32
+}
+
+// A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
+type Meter struct {
+	Name string
 }
 
 type Reading struct {
 	ID        int32
-	CreatedAt time.Time
+	CreatedAt pgtype.Timestamp
 }
 
 type Resource struct {
-	ID        int32
-	NaturalID sql.NullString
-	KindID    int32
-	CFOrgID   uuid.UUID
+	Meter         string
+	NaturalID     string
+	KindNaturalID string
+	CFOrgID       pgtype.UUID
 }
 
+// ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.
 type ResourceKind struct {
-	ID            int32
-	NaturalID     sql.NullString
-	Credits       sql.NullInt32
-	Amount        sql.NullInt32
-	UnitOfMeasure string
+	Meter         string
+	NaturalID     string
+	Credits       pgtype.Int4
+	Amount        pgtype.Int4
+	UnitOfMeasure pgtype.Text
 }
 
 type Tier struct {

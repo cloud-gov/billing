@@ -35,6 +35,10 @@ func NewCFServiceMeter(logger *slog.Logger, services CFServiceInstanceClient, sp
 	}
 }
 
+func (m *CFServiceMeter) Name() string {
+	return "cfservices"
+}
+
 // ReadUsage returns the point-in-time usage of services in Cloud Foundry.
 // Returns a non-nil error if there was an error during the overall process of reading usage information from the target system. If individual readings had errors, their errs fields should be set.
 func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
@@ -63,6 +67,7 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, e
 	m.logger.DebugContext(ctx, "service meter: aggregating services")
 	for i, instance := range si {
 		usage[i] = reader.Measurement{
+			Meter:                 m.Name(),
 			OrgID:                 spacesToOrgs[instance.Relationships.Space.Data.GUID],
 			ResourceKindNaturalID: instance.Relationships.ServicePlan.Data.GUID,
 			ResourceNaturalID:     instance.GUID,

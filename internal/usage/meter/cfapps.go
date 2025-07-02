@@ -29,7 +29,6 @@ type CFAppClient interface {
 
 type CFAppMeter struct {
 	logger *slog.Logger
-	name   string
 
 	apps      CFAppClient
 	processes CFProcessClient
@@ -38,10 +37,13 @@ type CFAppMeter struct {
 func NewCFAppMeter(logger *slog.Logger, apps CFAppClient, processes CFProcessClient) *CFAppMeter {
 	return &CFAppMeter{
 		logger:    logger.WithGroup("CFAppMeter"),
-		name:      "cfapps",
 		apps:      apps,
 		processes: processes,
 	}
+}
+
+func (m *CFAppMeter) Name() string {
+	return "cfapps"
 }
 
 func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error) {
@@ -56,23 +58,24 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 		return []reader.Measurement{}, err
 	}
 
-	var readings = make([]reader.Measurement, len(apps))
+	var measurements = []reader.Measurement{}
 
 	// Aggregate process usage info by app.
 	m.logger.DebugContext(ctx, "app meter: aggregating process usage")
-	appUsage := make(map[string]int, len(apps))
+	appUsage := map[string]int{}
 	for _, proc := range procs {
 		usage := proc.Instances * proc.MemoryInMB
 		appUsage[proc.Relationships.App.Data.GUID] += usage
 	}
 
 	m.logger.DebugContext(ctx, "app meter: aggregating app usage")
-	for i, app := range apps {
+	for _, app := range apps {
 		if app.State != appStateStarted {
 			// Only STARTED apps consume resources. Skip the rest.
 			continue
 		}
 		m := reader.Measurement{
+			Meter:             m.Name(),
 			ResourceNaturalID: app.GUID,
 			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
 		}
@@ -87,8 +90,8 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 			m.OrgID = orgGUID
 		}
 
-		readings[i] = m
+		measurements = append(measurements, m)
 	}
 
-	return readings, nil
+	return measurements, nil
 }

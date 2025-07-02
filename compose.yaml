@@ -5,8 +5,6 @@ services:
     image: postgres:15
     restart: always
     shm_size: 128mb
-    # networks:
-    #   - host
     ports:
       - 5432:5432
     volumes:
