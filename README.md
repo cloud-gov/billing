@@ -54,6 +54,7 @@ sql/          # Source SQL for sqlc to convert into Go.
 internal/     # All non-exported Go code for the service.
   api/        # The HTTP API surface of the application.
   db/         # Destination directory for sqlc-generated Go code.
+  jobs/       # River jobs for performing asynchronous work.
   server/     # Code for managing the web server lifecycle.
   usage/      # Code for reading usage information from Cloud.gov systems.
 gen.go        # Program-scope go:generate directives.

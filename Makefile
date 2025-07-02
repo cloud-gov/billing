@@ -48,12 +48,12 @@ clean: db-down
 
 .PHONY: db-init
 db-init:
-	@# Initialize all databases.
+	@# Initialize the database.
 	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 .PHONY: db-drop
 db-drop:
-	@# Drop all databases.
+	@# Drop the database.
 	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
 
 .PHONY: migrate
