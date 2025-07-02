@@ -45,6 +45,7 @@ func run(ctx context.Context, out io.Writer) error {
 		Level: slog.LevelDebug,
 	}))
 
+	logger.Debug("run: initializing CF client")
 	cfconf, err := config.NewFromCFHome()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrCFConfig, err)
@@ -54,19 +55,21 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("%w: %w", ErrCFClient, err)
 	}
 
+	logger.Debug("run: initializing database")
 	conn, err := pgxpool.New(ctx, "") // Pass empty connString so PG* environment variables will be used.
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDBConn, err)
 	}
 	q := db.New(conn)
 
-	logger.Debug("main: initializing meters")
+	logger.Debug("run: initializing meters")
 	meters := []reader.Meter{
 		meter.NewCFServiceMeter(logger, cfclient.ServiceInstances, cfclient.Spaces),
 		meter.NewCFAppMeter(logger, cfclient.Applications, cfclient.Processes),
 	}
 	rdr := reader.New(meters)
 
+	logger.Debug("run: initializing River workers and client")
 	workers := river.NewWorkers()
 
 	usageWorker, err := jobs.NewMeasureUsageWorker(logger, q, rdr)
@@ -87,10 +90,12 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("%w: %w", ErrRiverClientNew, err)
 	}
 
+	logger.Debug("run: starting River server")
 	if err = riverc.Start(ctx); err != nil {
 		return fmt.Errorf("%w: %w", ErrRiverClientStart, err)
 	}
 
+	logger.Debug("run: starting web server")
 	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc), logger)
 	srv.ListenAndServe(ctx)
 	return nil

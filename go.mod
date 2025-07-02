@@ -6,6 +6,8 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12.0.20250605163211-41fbb9ee824a
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/jackc/pgx/v5 v5.7.5
+	github.com/riverqueue/river v0.23.1
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
 )
 
 require (
@@ -40,10 +42,8 @@ require (
 	github.com/pingcap/log v1.1.0 // indirect
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20250324122243-d51e00e5bbf0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riverqueue/river v0.23.1 // indirect
 	github.com/riverqueue/river/cmd/river v0.23.1 // indirect
 	github.com/riverqueue/river/riverdriver v0.23.1 // indirect
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1 // indirect
 	github.com/riverqueue/river/riverdriver/riversqlite v0.23.1 // indirect
 	github.com/riverqueue/river/rivershared v0.23.1 // indirect
 	github.com/riverqueue/river/rivertype v0.23.1 // indirect
