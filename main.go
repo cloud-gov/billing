@@ -21,6 +21,8 @@ import (
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/jobs"
 	"github.com/cloud-gov/billing/internal/server"
+	"github.com/cloud-gov/billing/internal/usage/meter"
+	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
 var (
@@ -40,7 +42,7 @@ func run(ctx context.Context, out io.Writer) error {
 	defer cancel()
 
 	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: slog.LevelDebug,
 	}))
 
 	cfconf, err := config.NewFromCFHome()
@@ -58,9 +60,16 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 	q := db.New(conn)
 
+	logger.Debug("main: initializing meters")
+	meters := []reader.Meter{
+		meter.NewCFServiceMeter(logger, cfclient.ServiceInstances, cfclient.Spaces),
+		meter.NewCFAppMeter(logger, cfclient.Applications, cfclient.Processes),
+	}
+	rdr := reader.New(meters)
+
 	workers := river.NewWorkers()
 
-	usageWorker, err := jobs.NewMeasureUsageWorker(logger)
+	usageWorker, err := jobs.NewMeasureUsageWorker(logger, q, rdr)
 	if err != nil {
 		return err
 	}
