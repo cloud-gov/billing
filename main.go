@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/robfig/cron/v3"
 
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/db"
@@ -78,11 +79,24 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 	river.AddWorker(workers, usageWorker)
 
+	schedule, err := cron.ParseStandard("1 * * * *") // Read usage every hour, one minute after the hour.
+	if err != nil {
+		return err // todo
+	}
 	riverc, err := river.NewClient(riverpgxv5.New(conn), &river.Config{
 		JobTimeout: 10 * time.Minute,
 		Logger:     logger,
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: runtime.GOMAXPROCS(0)}, // Run as many workers as we have CPU cores available.
+		},
+		PeriodicJobs: []*river.PeriodicJob{
+			river.NewPeriodicJob(
+				schedule,
+				func() (river.JobArgs, *river.InsertOpts) {
+					return jobs.MeasureUsageArgs{}, nil
+				},
+				nil,
+			),
 		},
 		Workers: workers,
 	})

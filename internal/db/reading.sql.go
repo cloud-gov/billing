@@ -26,3 +26,20 @@ func (q *Queries) CreateReading(ctx context.Context, createdAt pgtype.Timestamp)
 	err := row.Scan(&i.ID, &i.CreatedAt)
 	return i, err
 }
+
+const readingExistsInHour = `-- name: ReadingExistsInHour :one
+SELECT EXISTS (
+    SELECT 1
+    FROM   reading
+    WHERE  created_at >= date_trunc('hour', now())
+           AND created_at <  date_trunc('hour', now()) + INTERVAL '1 hour'
+) AS reading_in_current_hour
+`
+
+// ReadingExistsInHour returns true if at least one Reading was created during the current hour. For instance, if the query is run at 2:55 and a reading was taken at 2:05, the query returns true. If the query is run at 2:55 and a reading was taken at 1:59, the query returns false.
+func (q *Queries) ReadingExistsInHour(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, readingExistsInHour)
+	var reading_in_current_hour bool
+	err := row.Scan(&reading_in_current_hour)
+	return reading_in_current_hour, err
+}

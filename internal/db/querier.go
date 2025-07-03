@@ -43,6 +43,8 @@ type Querier interface {
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
+	// ReadingExistsInHour returns true if at least one Reading was created during the current hour. For instance, if the query is run at 2:55 and a reading was taken at 2:05, the query returns true. If the query is run at 2:55 and a reading was taken at 1:59, the query returns false.
+	ReadingExistsInHour(ctx context.Context) (bool, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error

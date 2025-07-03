@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/riverqueue/river v0.23.1
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
+	github.com/robfig/cron/v3 v3.0.1
 )
 
 require (
