@@ -53,7 +53,8 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, error
 		return []reader.Measurement{}, err
 	}
 	m.logger.DebugContext(ctx, "app meter: listing apps")
-	apps, spaces, err := m.apps.ListIncludeSpacesAll(ctx, client.NewAppListOptions())
+	appopts := client.NewAppListOptions() // For fast troubleshooting, set .GUIDs to an app GUID.
+	apps, spaces, err := m.apps.ListIncludeSpacesAll(ctx, appopts)
 	if err != nil {
 		return []reader.Measurement{}, err
 	}

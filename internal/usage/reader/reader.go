@@ -38,7 +38,6 @@ type Reader struct {
 	meters []Meter
 }
 
-// TODO: Meter registration needs to make sure meters all have entries in the database.
 func New(meters []Meter) *Reader {
 	return &Reader{
 		meters: meters,

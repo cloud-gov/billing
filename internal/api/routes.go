@@ -10,54 +10,32 @@ import (
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/riverqueue/river"
 
 	"github.com/cloud-gov/billing/internal/db"
-	"github.com/cloud-gov/billing/internal/usage/meter"
-	"github.com/cloud-gov/billing/internal/usage/reader"
-	"github.com/cloud-gov/billing/internal/usage/recorder"
+	"github.com/cloud-gov/billing/internal/jobs"
 )
 
 // routes registers all routes for the server.
-func Routes(logger *slog.Logger, cf *client.Client, q db.Querier) http.Handler {
+func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx]) http.Handler {
 	mux := chi.NewMux()
 	mux.Use(middleware.Logger)
-	mux.Handle("/usage", handleUsage(logger.WithGroup("usage"), cf, q))
+	mux.Handle("/usage/job", handleUsageJob(riverc))
 	mux.Handle("/usage/app/{guid}", handleUsageApp(logger, cf, q))
 	return mux
 }
 
-// First draft. Later, this will be a scheduled background job.
-func handleUsage(logger *slog.Logger, cf *client.Client, q db.Querier) http.HandlerFunc {
-	logger.Debug("api: initializing meters")
-	meters := []reader.Meter{
-		meter.NewCFServiceMeter(logger, cf.ServiceInstances, cf.Spaces),
-		meter.NewCFAppMeter(logger, cf.Applications, cf.Processes),
-	}
-	reader := reader.New(meters)
-
+// TODO, how to correctly parameterize the river client?
+func handleUsageJob(riverc *river.Client[pgx.Tx]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		logger.DebugContext(ctx, "api: reading usage information")
-		reading, err := reader.Read(ctx)
+		result, err := riverc.Insert(r.Context(), jobs.MeasureUsageArgs{}, nil)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Failed to insert River job: %v\n", err), http.StatusInternalServerError)
 			return
 		}
-
-		logger.DebugContext(ctx, "api: recording usage reading")
-		err = recorder.RecordReading(ctx, logger, q, reading)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		logger.DebugContext(ctx, "api: writing response bytes")
-		_, err = fmt.Fprintf(w, "Wrote %v measurements to database.", len(reading.Measurements))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		io.WriteString(w, fmt.Sprintf("Inserted job with ID: %v\n", result.Job.ID))
 	})
 }
 
