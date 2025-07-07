@@ -94,7 +94,9 @@ func run(ctx context.Context, out io.Writer) error {
 			river.NewPeriodicJob(
 				schedule,
 				func() (river.JobArgs, *river.InsertOpts) {
-					return jobs.MeasureUsageArgs{}, nil
+					return jobs.MeasureUsageArgs{
+						Periodic: true,
+					}, nil
 				},
 				nil,
 			),

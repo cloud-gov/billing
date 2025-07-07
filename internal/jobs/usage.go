@@ -23,6 +23,8 @@ var (
 )
 
 type MeasureUsageArgs struct {
+	// Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.
+	Periodic bool
 }
 
 func (MeasureUsageArgs) Kind() string {
@@ -63,7 +65,7 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 	}
 
 	logger.DebugContext(ctx, "measure-usage job: recording usage reading")
-	err = recorder.RecordReading(ctx, logger, txquerier, reading)
+	err = recorder.RecordReading(ctx, logger, txquerier, reading, job.Args.Periodic)
 	if err != nil && !errors.Is(err, recorder.ErrReadingExists) {
 		// If err is ErrReadingExists, a Reading was already recorded for this hour. We can continue completing the job. Other errors are unexpected and are returned.
 		return err

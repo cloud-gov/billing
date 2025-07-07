@@ -19,10 +19,13 @@ var (
 )
 
 // RecordReading saves a reading to the database. It returns [ErrReadingExists] if a Reading already exists for the same hour of r.Time.
-func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading) error {
+func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading, periodic bool) error {
 	logger.Debug("creating reading in database")
 
-	dbReading, err := q.CreateUniqueReading(ctx, pgxTimestamp(r.Time))
+	dbReading, err := q.CreateUniqueReading(ctx, db.CreateUniqueReadingParams{
+		CreatedAt: pgxTimestamp(r.Time),
+		Periodic:  periodic,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// ErrNoRows is returned if a row already exists for the given hour. The caller may not consider the Reading existing to be an error. Allow them to handle it differently.
