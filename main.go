@@ -20,6 +20,7 @@ import (
 
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbtx"
 	"github.com/cloud-gov/billing/internal/jobs"
 	"github.com/cloud-gov/billing/internal/server"
 	"github.com/cloud-gov/billing/internal/usage/meter"
@@ -61,7 +62,7 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDBConn, err)
 	}
-	q := db.New(conn)
+	q := dbtx.NewQuerier(db.New(conn))
 
 	logger.Debug("run: initializing meters")
 	meters := []reader.Meter{
@@ -73,7 +74,7 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: initializing River workers and client")
 	workers := river.NewWorkers()
 
-	usageWorker, err := jobs.NewMeasureUsageWorker(logger, q, rdr)
+	usageWorker, err := jobs.NewMeasureUsageWorker(logger, conn, q, rdr)
 	if err != nil {
 		return err
 	}

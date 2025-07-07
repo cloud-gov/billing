@@ -35,7 +35,7 @@ func handleUsageJob(riverc *river.Client[pgx.Tx]) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("Failed to insert River job: %v\n", err), http.StatusInternalServerError)
 			return
 		}
-		io.WriteString(w, fmt.Sprintf("Inserted job with ID: %v\n", result.Job.ID))
+		io.WriteString(w, fmt.Sprintf("Inserted job with ID: %v\nUniqueSkippedAsDuplicate: %v", result.Job.ID, result.UniqueSkippedAsDuplicate))
 	})
 }
 
