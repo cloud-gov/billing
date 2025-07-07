@@ -69,3 +69,6 @@ main.go       # Entrypoint for the server program.
 
 - [Go.dev: Organizing a Go module](https://go.dev/doc/modules/layout) explains the basic, conventional layout of Go programs.
 - [Grafana: How I write HTTP services in Go after 13 years](https://grafana.com/blog/2024/02/09/how-i-write-http-services-in-go-after-13-years) is a source for much of the basic structure of the service.
+- [Go Wiki: Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)
+- [The Go Blog: Package Names](https://go.dev/blog/package-names)
+- [brandur.org: How We Went All In on sqlc/pgx for Postgres + Go](https://brandur.org/sqlc#caveats)

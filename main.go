@@ -16,9 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/robfig/cron/v3"
 
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbtx"
 	"github.com/cloud-gov/billing/internal/jobs"
 	"github.com/cloud-gov/billing/internal/server"
 	"github.com/cloud-gov/billing/internal/usage/meter"
@@ -45,6 +47,7 @@ func run(ctx context.Context, out io.Writer) error {
 		Level: slog.LevelDebug,
 	}))
 
+	logger.Debug("run: initializing CF client")
 	cfconf, err := config.NewFromCFHome()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrCFConfig, err)
@@ -54,32 +57,49 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("%w: %w", ErrCFClient, err)
 	}
 
+	logger.Debug("run: initializing database")
 	conn, err := pgxpool.New(ctx, "") // Pass empty connString so PG* environment variables will be used.
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDBConn, err)
 	}
-	q := db.New(conn)
+	q := dbtx.NewQuerier(db.New(conn))
 
-	logger.Debug("main: initializing meters")
+	logger.Debug("run: initializing meters")
 	meters := []reader.Meter{
 		meter.NewCFServiceMeter(logger, cfclient.ServiceInstances, cfclient.Spaces),
 		meter.NewCFAppMeter(logger, cfclient.Applications, cfclient.Processes),
 	}
 	rdr := reader.New(meters)
 
+	logger.Debug("run: initializing River workers and client")
 	workers := river.NewWorkers()
 
-	usageWorker, err := jobs.NewMeasureUsageWorker(logger, q, rdr)
+	usageWorker, err := jobs.NewMeasureUsageWorker(logger, conn, q, rdr)
 	if err != nil {
 		return err
 	}
 	river.AddWorker(workers, usageWorker)
 
+	schedule, err := cron.ParseStandard("1 * * * *") // Read usage every hour, one minute after the hour.
+	if err != nil {
+		return err // todo
+	}
 	riverc, err := river.NewClient(riverpgxv5.New(conn), &river.Config{
 		JobTimeout: 10 * time.Minute,
 		Logger:     logger,
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: runtime.GOMAXPROCS(0)}, // Run as many workers as we have CPU cores available.
+		},
+		PeriodicJobs: []*river.PeriodicJob{
+			river.NewPeriodicJob(
+				schedule,
+				func() (river.JobArgs, *river.InsertOpts) {
+					return jobs.MeasureUsageArgs{
+						Periodic: true,
+					}, nil
+				},
+				nil,
+			),
 		},
 		Workers: workers,
 	})
@@ -87,10 +107,12 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("%w: %w", ErrRiverClientNew, err)
 	}
 
+	logger.Debug("run: starting River server")
 	if err = riverc.Start(ctx); err != nil {
 		return fmt.Errorf("%w: %w", ErrRiverClientStart, err)
 	}
 
+	logger.Debug("run: starting web server")
 	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc), logger)
 	srv.ListenAndServe(ctx)
 	return nil

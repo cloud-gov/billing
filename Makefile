@@ -61,7 +61,7 @@ migrate: db-init
 	@# Migrate to the latest migration.
 	@set -a; source docker.env; set +a; go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@go tool river migrate-up
+	@set -a; source docker.env; set +a; go tool river migrate-up
 
 .PHONY: db-reset
 db-reset: db-drop db-init migrate

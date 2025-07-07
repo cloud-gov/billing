@@ -44,22 +44,21 @@ func New(meters []Meter) *Reader {
 	}
 }
 
-func (m *Reader) Read(ctx context.Context) (Reading, error) {
+// Read calls ReadUsage on all registered Meters and returns the result in aggregate.
+func (rdr *Reader) Read(ctx context.Context) (Reading, error) {
 	reading := Reading{
 		Time:         time.Now().UTC(),
 		Measurements: make([]Measurement, 0),
 	}
 	var reterr error
 
-	for _, p := range m.meters {
-		r, err := p.ReadUsage(ctx)
+	for _, p := range rdr.meters {
+		meas, err := p.ReadUsage(ctx)
 		if err != nil {
 			reterr = errors.Join(reterr, err)
 		}
-		reading.Measurements = append(reading.Measurements, r...)
+		reading.Measurements = append(reading.Measurements, meas...)
 	}
 
 	return reading, reterr
 }
-
-// next step: POST a ReadMeter job or something. Starts a job which finishes when services are read and result is stored in the database.

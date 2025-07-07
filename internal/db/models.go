@@ -37,6 +37,8 @@ type Meter struct {
 type Reading struct {
 	ID        int32
 	CreatedAt pgtype.Timestamp
+	// Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.
+	Periodic bool
 }
 
 type Resource struct {
