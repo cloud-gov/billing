@@ -2,21 +2,32 @@ package recorder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-// RecordReading saves a reading to the database.
+var (
+	ErrReadingExists = errors.New("a reading already exists for the hour of created_at")
+)
+
+// RecordReading saves a reading to the database. It returns [ErrReadingExists] if a Reading already exists for the same hour of r.Time.
 func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading) error {
 	logger.Debug("creating reading in database")
-	dbReading, err := q.CreateReading(ctx, pgxTimestamp(r.Time))
+
+	dbReading, err := q.CreateUniqueReading(ctx, pgxTimestamp(r.Time))
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// ErrNoRows is returned if a row already exists for the given hour. The caller may not consider the Reading existing to be an error. Allow them to handle it differently.
+			return ErrReadingExists
+		}
 		return err
 	}
 

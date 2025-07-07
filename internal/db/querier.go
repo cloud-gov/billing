@@ -29,6 +29,8 @@ type Querier interface {
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
+	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
+	CreateUniqueReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
@@ -43,8 +45,6 @@ type Querier interface {
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
-	// ReadingExistsInHour returns true if at least one Reading was created during the current hour. For instance, if the query is run at 2:55 and a reading was taken at 2:05, the query returns true. If the query is run at 2:55 and a reading was taken at 1:59, the query returns false.
-	ReadingExistsInHour(ctx context.Context) (bool, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error

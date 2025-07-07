@@ -27,19 +27,21 @@ func (q *Queries) CreateReading(ctx context.Context, createdAt pgtype.Timestamp)
 	return i, err
 }
 
-const readingExistsInHour = `-- name: ReadingExistsInHour :one
-SELECT EXISTS (
-    SELECT 1
-    FROM   reading
-    WHERE  created_at >= date_trunc('hour', now())
-           AND created_at <  date_trunc('hour', now()) + INTERVAL '1 hour'
-) AS reading_in_current_hour
+const createUniqueReading = `-- name: CreateUniqueReading :one
+INSERT INTO reading (
+    created_at
+) VALUES (
+    $1
+)
+ON CONFLICT (date_trunc('hour', created_at))
+DO NOTHING
+RETURNING id, created_at
 `
 
-// ReadingExistsInHour returns true if at least one Reading was created during the current hour. For instance, if the query is run at 2:55 and a reading was taken at 2:05, the query returns true. If the query is run at 2:55 and a reading was taken at 1:59, the query returns false.
-func (q *Queries) ReadingExistsInHour(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, readingExistsInHour)
-	var reading_in_current_hour bool
-	err := row.Scan(&reading_in_current_hour)
-	return reading_in_current_hour, err
+// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
+func (q *Queries) CreateUniqueReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error) {
+	row := q.db.QueryRow(ctx, createUniqueReading, createdAt)
+	var i Reading
+	err := row.Scan(&i.ID, &i.CreatedAt)
+	return i, err
 }

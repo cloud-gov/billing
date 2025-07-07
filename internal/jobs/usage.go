@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -25,7 +26,7 @@ type MeasureUsageArgs struct {
 }
 
 func (MeasureUsageArgs) Kind() string {
-	return "read-record-usage"
+	return "measure-usage"
 }
 
 // MeasureUsageWorker reads and records usage data. Use [NewMeasureUsageWorker] to create an instance for registration with the River client.
@@ -43,10 +44,9 @@ func (u *MeasureUsageWorker) InsertOpts() river.InsertOpts {
 	}
 }
 
-// Work reads usage from all registered meters and persists the reading to the database. It is idempotent if run multiple times within the same hour: For example, at 2:05 and 2:10, but not 2:55 and 1:05. Along with the embedded river.WorkerDefaults, Work fulfills River's Worker interface.
+// Work reads usage from all registered meters and persists the reading to the database if no reading exists for the current hour. It is idempotent if run multiple times within the same hour: For example, at 2:05 and 2:10, but not 2:55 and 1:05. Along with the embedded river.WorkerDefaults, Work fulfills River's Worker interface.
 // Transactional job completion example: https://riverqueue.com/docs/transactional-job-completion
 func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsageArgs]) error {
-	// If a reading exists from within this hour, the job has already run. Return early so the work function is idempotent.
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return err
@@ -54,29 +54,25 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 	defer tx.Rollback(ctx)
 
 	txquerier := querier.WithTx(tx)
-	exists, err := txquerier.ReadingExistsInHour(ctx)
-	if err != nil || exists {
-		logger.Debug("MeasureUsageWorker.Work: reading was already recorded for this hour; exiting job")
-		return err // If exists && err == nil, nil is returned.
-	}
 
-	// Read and record usage
-	logger.DebugContext(ctx, "api: reading usage information")
+	logger.DebugContext(ctx, "measure-usage job: reading usage information")
+	// TODO: This is an expensive operation. It can be avoided if we try inserting a Reading into the database with q.CreateUniqueReading before calling Read(), but as written, the Reading is only returned when all its meters have read usage. If we upsert the Reading earlier, we can mark the job Complete early.
 	reading, err := rdr.Read(ctx)
 	if err != nil {
 		return err
 	}
 
-	logger.DebugContext(ctx, "api: recording usage reading")
+	logger.DebugContext(ctx, "measure-usage job: recording usage reading")
 	err = recorder.RecordReading(ctx, logger, txquerier, reading)
-	if err != nil {
+	if err != nil && !errors.Is(err, recorder.ErrReadingExists) {
+		// If err is ErrReadingExists, a Reading was already recorded for this hour. We can continue completing the job. Other errors are unexpected and are returned.
 		return err
 	}
 	jobAfter, err := river.JobCompleteTx[*riverpgxv5.Driver](ctx, tx, job)
 	if err != nil {
 		return err
 	}
-	logger.Info(fmt.Sprintf("transitioned MeasureUsageWorker job from %q to %q", job.State, jobAfter.State))
+	logger.Info(fmt.Sprintf("measure-usage job: transitioned job from %q to %q", job.State, jobAfter.State))
 
 	err = tx.Commit(ctx)
 	return err
