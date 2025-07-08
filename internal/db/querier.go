@@ -16,26 +16,34 @@ type Querier interface {
 	CreateResource(ctx context.Context, arg CreateResourceParams) (Resource, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
+	CreateTransactionType(ctx context.Context, name string) (TransactionType, error)
 	DeleteCFOrg(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
 	DeleteResource(ctx context.Context, id int32) error
 	DeleteResourceKind(ctx context.Context, id int32) error
 	DeleteTier(ctx context.Context, id int32) error
+	DeleteTransactionType(ctx context.Context, id int32) error
 	GetCFOrg(ctx context.Context, id uuid.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResource(ctx context.Context, id int32) (Resource, error)
 	GetResourceKind(ctx context.Context, id int32) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
+	GetTransactionType(ctx context.Context, id int32) (TransactionType, error)
+	GetTransactions(ctx context.Context, id int32) (Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
+	ListTransactionType(ctx context.Context) ([]TransactionType, error)
+	ListTransactions(ctx context.Context) ([]Transaction, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
+	UpdateTransactionType(ctx context.Context, arg UpdateTransactionTypeParams) error
 }
 
 var _ Querier = (*Queries)(nil)

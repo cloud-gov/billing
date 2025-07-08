@@ -1,7 +1,7 @@
 
 -- name: ListTransactions :many
 SELECT * FROM transactions
-ORDER BY transaction_id;
+ORDER BY id;
 
 -- name: GetTransactions :one
 SELECT * FROM transactions
@@ -9,7 +9,7 @@ WHERE id = $1 LIMIT 1;
 
 -- name: CreateTransaction :one
 INSERT INTO transactions (
-  transaction_date, resource_id, cf_ord_id, description, direction, amount, transaction_type_id
+  transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7
 )
