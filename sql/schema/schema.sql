@@ -10,9 +10,8 @@ CREATE TABLE transactions (
   CONSTRAINT fk_resource_id Foreign Key (resource_id) REFERENCES resource(id),
   CONSTRAINT fk_cf_org_id Foreign Key (cf_org_id) REFERENCES cf_org(id),
   CONSTRAINT fk_transaction_type_id Foreign Key (transaction_type_id) REFERENCES transaction_type(id)
-
-
 );
+
 CREATE TABLE transaction_type (
   id SERIAL NOT NULL,
   name TEXT NOT NULL
