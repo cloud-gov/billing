@@ -38,11 +38,15 @@ type Querier interface {
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
+	GetTransactionType(ctx context.Context, id int32) (TransactionType, error)
+	GetTransactions(ctx context.Context, id int32) (Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
+	ListTransactionType(ctx context.Context) ([]TransactionType, error)
+	ListTransactions(ctx context.Context) ([]Transaction, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
