@@ -5,7 +5,7 @@ ORDER BY transaction_id;
 
 -- name: GetTransactions :one
 SELECT * FROM transactions
-WHERE WHERE id = $1 LIMIT 1;
+WHERE id = $1 LIMIT 1;
 
 -- name: CreateTransaction :one
 INSERT INTO transactions (
@@ -25,7 +25,7 @@ ORDER BY name;
 
 -- name: UpdateTransactionType :exec
 UPDATE transaction_type
-  set name = $2,
+  set name = $2
   WHERE id = $1;
 
 -- name: DeleteTransactionType :exec
