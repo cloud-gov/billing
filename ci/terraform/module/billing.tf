@@ -22,8 +22,9 @@ resource "cloudfoundry_app" "billing" {
   org_name   = var.org_name
   space_name = var.space_name
 
-  path       = data.archive_file.app_zip.output_path
-  buildpacks = ["go_buildpack"]
+  path             = data.archive_file.app_zip.output_path
+  buildpacks       = ["go_buildpack"]
+  source_code_hash = data.archive_file.app_zip.output_base64sha256
 
   command    = "billing"
   instances  = var.instances
