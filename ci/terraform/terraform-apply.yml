@@ -1,0 +1,13 @@
+---
+platform: linux
+
+inputs:
+  - name: terraform-plugin-cache
+  - name: terraform-templates
+  - name: pipeline-tasks
+outputs:
+  - name: terraform-state
+  - name: updated-terraform-plugin-cache
+
+run:
+  path: terraform-templates/ci/terraform/terraform-apply.sh
