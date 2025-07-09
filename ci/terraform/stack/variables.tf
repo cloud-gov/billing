@@ -3,11 +3,6 @@ variable "stack_name" {
   description = "One of development, staging, production."
 }
 
-variable "aws_region_govcloud" {
-  type        = string
-  description = "The AWS region in GovCloud in which to deploy the billing service."
-}
-
 variable "org_name" {
   type = string
 }
