@@ -35,15 +35,12 @@ resource "cloudfoundry_app" "billing" {
     "GOVERSION" = "1.24"
   }
 
-  # readiness_health_check_type          = "http"
-  # readiness_health_check_http_endpoint = "/ready"
-
   routes = [{
     route = local.billing_route
   }]
 
   service_bindings = [{
-    service_instance = "billing-db"
+    service_instance = cloudfoundry_service_instance.db.name
   }]
 }
 
