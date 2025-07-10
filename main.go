@@ -22,23 +22,30 @@ import (
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbtx"
 	"github.com/cloud-gov/billing/internal/jobs"
+	"github.com/cloud-gov/billing/internal/migrate"
 	"github.com/cloud-gov/billing/internal/server"
 	"github.com/cloud-gov/billing/internal/usage/meter"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
 var (
-	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
 	ErrCFClient         = errors.New("creating Cloud Foundry client")
+	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
 	ErrDBConn           = errors.New("connecting to database")
+	ErrDBMigration      = errors.New("migrating the database")
 	ErrRiverClientNew   = errors.New("creating River client")
 	ErrRiverClientStart = errors.New("starting River client")
 )
 
-// run sets up dependencies, calls route registration, and starts the server.
-// It is separate from main so it can return errors conventionally and main
-// can handle them all in one place, and so the [io.Writer] can be passed as a
-// dependency, making it possible to mock and test for outputs.
+func fmtErr(outer, inner error) error {
+	return fmt.Errorf("%w: %w", outer, inner)
+}
+
+// run sets up dependencies, migrates the database to the latest
+// migration, calls route registration, and starts the server. It is separate
+// from main so it can return errors conventionally and main can handle them
+// all in one place, and so the [io.Writer] can be passed as a dependency,
+// making it possible to mock and test for outputs.
 func run(ctx context.Context, out io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
@@ -50,7 +57,7 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: initializing CF client")
 	cfconf, err := config.NewFromCFHome()
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrCFConfig, err)
+		return fmtErr(ErrCFConfig, err)
 	}
 	cfclient, err := client.New(cfconf)
 	if err != nil {
@@ -60,8 +67,15 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: initializing database")
 	conn, err := pgxpool.New(ctx, "") // Pass empty connString so PG* environment variables will be used.
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDBConn, err)
+		return fmtErr(ErrDBConn, err)
 	}
+
+	logger.Debug("run: migrating the database")
+	err = migrate.Migrate(ctx, conn)
+	if err != nil {
+		return fmtErr(ErrDBMigration, err)
+	}
+
 	q := dbtx.NewQuerier(db.New(conn))
 
 	logger.Debug("run: initializing meters")
@@ -104,12 +118,12 @@ func run(ctx context.Context, out io.Writer) error {
 		Workers: workers,
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrRiverClientNew, err)
+		return fmtErr(ErrRiverClientNew, err)
 	}
 
 	logger.Debug("run: starting River server")
 	if err = riverc.Start(ctx); err != nil {
-		return fmt.Errorf("%w: %w", ErrRiverClientStart, err)
+		return fmtErr(ErrRiverClientStart, err)
 	}
 
 	logger.Debug("run: starting web server")
