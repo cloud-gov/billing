@@ -221,6 +221,7 @@ $tf/
 # Terraform
 *.tfstate
 *.tfvars
+*.tfstate.backup
 
 # Custom
 *.zip
