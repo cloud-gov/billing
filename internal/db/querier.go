@@ -31,25 +31,33 @@ type Querier interface {
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
 	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
 	CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error)
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
+	CreateTransactionType(ctx context.Context, name string) (TransactionType, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
+	DeleteTransactionType(ctx context.Context, id int32) error
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
+	GetTransaction(ctx context.Context, id int32) (Transaction, error)
+	GetTransactionType(ctx context.Context, id int32) (TransactionType, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
+	ListTransactionTypes(ctx context.Context) ([]TransactionType, error)
+	ListTransactions(ctx context.Context) ([]Transaction, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
+	UpdateTransactionType(ctx context.Context, arg UpdateTransactionTypeParams) error
 	// UpsertResource upserts a Resource and creates minimal rows in foreign tables -- namely meter, cf_org, and resource_kind -- to which Resource has foreign keys. Efficient for single inserts. For bulk inserts, review Bulk* functions.
 	UpsertResource(ctx context.Context, arg UpsertResourceParams) (Resource, error)
 }
