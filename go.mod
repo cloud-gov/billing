@@ -6,6 +6,9 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12.0.20250605163211-41fbb9ee824a
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/jackc/pgx/v5 v5.7.5
+	github.com/riverqueue/river v0.23.1
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
+	github.com/robfig/cron/v3 v3.0.1
 )
 
 require (
@@ -40,10 +43,8 @@ require (
 	github.com/pingcap/log v1.1.0 // indirect
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20250324122243-d51e00e5bbf0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riverqueue/river v0.23.1 // indirect
 	github.com/riverqueue/river/cmd/river v0.23.1 // indirect
 	github.com/riverqueue/river/riverdriver v0.23.1 // indirect
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1 // indirect
 	github.com/riverqueue/river/riverdriver/riversqlite v0.23.1 // indirect
 	github.com/riverqueue/river/rivershared v0.23.1 // indirect
 	github.com/riverqueue/river/rivertype v0.23.1 // indirect
@@ -66,9 +67,9 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect

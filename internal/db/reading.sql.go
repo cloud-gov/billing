@@ -17,12 +17,36 @@ INSERT INTO reading (
 ) VALUES (
 	$1
 )
-RETURNING id, created_at
+RETURNING id, created_at, periodic
 `
 
 func (q *Queries) CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error) {
 	row := q.db.QueryRow(ctx, createReading, createdAt)
 	var i Reading
-	err := row.Scan(&i.ID, &i.CreatedAt)
+	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
+	return i, err
+}
+
+const createUniqueReading = `-- name: CreateUniqueReading :one
+INSERT INTO reading (
+    created_at, periodic
+) VALUES (
+    $1, $2
+)
+ON CONFLICT (date_trunc('hour', created_at))
+DO NOTHING
+RETURNING id, created_at, periodic
+`
+
+type CreateUniqueReadingParams struct {
+	CreatedAt pgtype.Timestamp
+	Periodic  bool
+}
+
+// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
+func (q *Queries) CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error) {
+	row := q.db.QueryRow(ctx, createUniqueReading, arg.CreatedAt, arg.Periodic)
+	var i Reading
+	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
 	return i, err
 }

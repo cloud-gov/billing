@@ -29,6 +29,8 @@ type Querier interface {
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
+	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
+	CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error)
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
 	CreateTransactionType(ctx context.Context, name string) (TransactionType, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
