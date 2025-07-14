@@ -63,11 +63,10 @@ type Tier struct {
 
 type Transaction struct {
 	ID                int32
-	TransactionDate   sql.NullTime
-	ResourceID        int32
-	CFOrgID           uuid.UUID
-	Description       sql.NullString
-	Direction         sql.NullInt32
+	TransactionDate   pgtype.Date
+	CFOrgID           pgtype.UUID
+	Description       pgtype.Text
+	Direction         pgtype.Int4
 	Amount            int32
 	TransactionTypeID int32
 }

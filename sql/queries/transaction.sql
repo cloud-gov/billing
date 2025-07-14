@@ -1,17 +1,17 @@
 
 -- name: ListTransactions :many
-SELECT * FROM transactions
+SELECT * FROM transaction
 ORDER BY id;
 
--- name: GetTransactions :one
-SELECT * FROM transactions
+-- name: GetTransaction :one
+SELECT * FROM transaction
 WHERE id = $1 LIMIT 1;
 
 -- name: CreateTransaction :one
-INSERT INTO transactions (
-  transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id
+INSERT INTO transaction (
+  transaction_date, cf_org_id, description, direction, amount, transaction_type_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6
 )
 RETURNING *;
 
@@ -19,7 +19,7 @@ RETURNING *;
 SELECT * FROM transaction_type
 WHERE id = $1 LIMIT 1;
 
--- name: ListTransactionType :many
+-- name: ListTransactionTypes :many
 SELECT * FROM transaction_type
 ORDER BY name;
 

@@ -7,34 +7,31 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (
-  transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id
+INSERT INTO transaction (
+  transaction_date, cf_org_id, description, direction, amount, transaction_type_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6
 )
-RETURNING id, transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id
+RETURNING id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id
 `
 
 type CreateTransactionParams struct {
-	TransactionDate   sql.NullTime
-	ResourceID        int32
-	CFOrgID           uuid.UUID
-	Description       sql.NullString
-	Direction         sql.NullInt32
+	TransactionDate   pgtype.Date
+	CFOrgID           pgtype.UUID
+	Description       pgtype.Text
+	Direction         pgtype.Int4
 	Amount            int32
 	TransactionTypeID int32
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, createTransaction,
+	row := q.db.QueryRow(ctx, createTransaction,
 		arg.TransactionDate,
-		arg.ResourceID,
 		arg.CFOrgID,
 		arg.Description,
 		arg.Direction,
@@ -45,7 +42,6 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 	err := row.Scan(
 		&i.ID,
 		&i.TransactionDate,
-		&i.ResourceID,
 		&i.CFOrgID,
 		&i.Description,
 		&i.Direction,
@@ -65,7 +61,7 @@ RETURNING id, name
 `
 
 func (q *Queries) CreateTransactionType(ctx context.Context, name string) (TransactionType, error) {
-	row := q.db.QueryRowContext(ctx, createTransactionType, name)
+	row := q.db.QueryRow(ctx, createTransactionType, name)
 	var i TransactionType
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
@@ -77,34 +73,21 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteTransactionType(ctx context.Context, id int32) error {
-	_, err := q.db.ExecContext(ctx, deleteTransactionType, id)
+	_, err := q.db.Exec(ctx, deleteTransactionType, id)
 	return err
 }
 
-const getTransactionType = `-- name: GetTransactionType :one
-SELECT id, name FROM transaction_type
+const getTransaction = `-- name: GetTransaction :one
+SELECT id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id FROM transaction
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetTransactionType(ctx context.Context, id int32) (TransactionType, error) {
-	row := q.db.QueryRowContext(ctx, getTransactionType, id)
-	var i TransactionType
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
-}
-
-const getTransactions = `-- name: GetTransactions :one
-SELECT id, transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id FROM transactions
-WHERE id = $1 LIMIT 1
-`
-
-func (q *Queries) GetTransactions(ctx context.Context, id int32) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, getTransactions, id)
+func (q *Queries) GetTransaction(ctx context.Context, id int32) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getTransaction, id)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
 		&i.TransactionDate,
-		&i.ResourceID,
 		&i.CFOrgID,
 		&i.Description,
 		&i.Direction,
@@ -114,13 +97,25 @@ func (q *Queries) GetTransactions(ctx context.Context, id int32) (Transaction, e
 	return i, err
 }
 
-const listTransactionType = `-- name: ListTransactionType :many
+const getTransactionType = `-- name: GetTransactionType :one
+SELECT id, name FROM transaction_type
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetTransactionType(ctx context.Context, id int32) (TransactionType, error) {
+	row := q.db.QueryRow(ctx, getTransactionType, id)
+	var i TransactionType
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const listTransactionTypes = `-- name: ListTransactionTypes :many
 SELECT id, name FROM transaction_type
 ORDER BY name
 `
 
-func (q *Queries) ListTransactionType(ctx context.Context) ([]TransactionType, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactionType)
+func (q *Queries) ListTransactionTypes(ctx context.Context) ([]TransactionType, error) {
+	rows, err := q.db.Query(ctx, listTransactionTypes)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +128,6 @@ func (q *Queries) ListTransactionType(ctx context.Context) ([]TransactionType, e
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -143,12 +135,12 @@ func (q *Queries) ListTransactionType(ctx context.Context) ([]TransactionType, e
 }
 
 const listTransactions = `-- name: ListTransactions :many
-SELECT id, transaction_date, resource_id, cf_org_id, description, direction, amount, transaction_type_id FROM transactions
+SELECT id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id FROM transaction
 ORDER BY id
 `
 
 func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
-	rows, err := q.db.QueryContext(ctx, listTransactions)
+	rows, err := q.db.Query(ctx, listTransactions)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +151,6 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.TransactionDate,
-			&i.ResourceID,
 			&i.CFOrgID,
 			&i.Description,
 			&i.Direction,
@@ -169,9 +160,6 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -191,6 +179,6 @@ type UpdateTransactionTypeParams struct {
 }
 
 func (q *Queries) UpdateTransactionType(ctx context.Context, arg UpdateTransactionTypeParams) error {
-	_, err := q.db.ExecContext(ctx, updateTransactionType, arg.ID, arg.Name)
+	_, err := q.db.Exec(ctx, updateTransactionType, arg.ID, arg.Name)
 	return err
 }
