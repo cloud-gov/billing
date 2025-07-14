@@ -60,3 +60,18 @@ type Tier struct {
 	Name        string
 	TierCredits int64
 }
+
+type Transaction struct {
+	ID                int32
+	TransactionDate   pgtype.Date
+	CFOrgID           pgtype.UUID
+	Description       pgtype.Text
+	Direction         pgtype.Int4
+	Amount            int32
+	TransactionTypeID int32
+}
+
+type TransactionType struct {
+	ID   int32
+	Name string
+}
