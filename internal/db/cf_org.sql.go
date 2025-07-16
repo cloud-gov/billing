@@ -24,43 +24,6 @@ func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 	return err
 }
 
-const createCFOrg = `-- name: CreateCFOrg :one
-INSERT INTO cf_org (
-  name, tier_id, credits_quota, credits_used, customer_id
-) VALUES (
-  $1, $2, $3, $4, $5
-)
-RETURNING id, name, tier_id, credits_quota, credits_used, customer_id
-`
-
-type CreateCFOrgParams struct {
-	Name         pgtype.Text
-	TierID       pgtype.Int4
-	CreditsQuota pgtype.Int8
-	CreditsUsed  pgtype.Int8
-	CustomerID   pgtype.Int8
-}
-
-func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
-	row := q.db.QueryRow(ctx, createCFOrg,
-		arg.Name,
-		arg.TierID,
-		arg.CreditsQuota,
-		arg.CreditsUsed,
-		arg.CustomerID,
-	)
-	var i CFOrg
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.TierID,
-		&i.CreditsQuota,
-		&i.CreditsUsed,
-		&i.CustomerID,
-	)
-	return i, err
-}
-
 const deleteCFOrg = `-- name: DeleteCFOrg :exec
 DELETE FROM cf_org
 WHERE id = $1
@@ -72,26 +35,19 @@ func (q *Queries) DeleteCFOrg(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getCFOrg = `-- name: GetCFOrg :one
-SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
+SELECT id, name, customer_id FROM cf_org
 WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
 	row := q.db.QueryRow(ctx, getCFOrg, id)
 	var i CFOrg
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.TierID,
-		&i.CreditsQuota,
-		&i.CreditsUsed,
-		&i.CustomerID,
-	)
+	err := row.Scan(&i.ID, &i.Name, &i.CustomerID)
 	return i, err
 }
 
 const listCFOrgs = `-- name: ListCFOrgs :many
-SELECT id, name, tier_id, credits_quota, credits_used, customer_id FROM cf_org
+SELECT id, name, customer_id FROM cf_org
 ORDER BY name
 `
 
@@ -104,14 +60,7 @@ func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
 	var items []CFOrg
 	for rows.Next() {
 		var i CFOrg
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.TierID,
-			&i.CreditsQuota,
-			&i.CreditsUsed,
-			&i.CustomerID,
-		); err != nil {
+		if err := rows.Scan(&i.ID, &i.Name, &i.CustomerID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -124,28 +73,16 @@ func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
 
 const updateCFOrg = `-- name: UpdateCFOrg :exec
 UPDATE cf_org
-  set name = $2,
-  tier_id = $3,
-  credits_quota = $4,
-  credits_used = $5
+  set name = $2
 WHERE id = $1
 `
 
 type UpdateCFOrgParams struct {
-	ID           pgtype.UUID
-	Name         pgtype.Text
-	TierID       pgtype.Int4
-	CreditsQuota pgtype.Int8
-	CreditsUsed  pgtype.Int8
+	ID   pgtype.UUID
+	Name pgtype.Text
 }
 
 func (q *Queries) UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error {
-	_, err := q.db.Exec(ctx, updateCFOrg,
-		arg.ID,
-		arg.Name,
-		arg.TierID,
-		arg.CreditsQuota,
-		arg.CreditsUsed,
-	)
+	_, err := q.db.Exec(ctx, updateCFOrg, arg.ID, arg.Name)
 	return err
 }

@@ -13,117 +13,51 @@ import (
 
 const createTransaction = `-- name: CreateTransaction :one
 INSERT INTO transaction (
-  transaction_date, cf_org_id, description, direction, amount, transaction_type_id
+  occurred_at, description, type
 ) VALUES (
-  $1, $2, $3, $4, $5, $6
+  $1, $2, $3
 )
-RETURNING id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id
+RETURNING id, occurred_at, description, type
 `
 
 type CreateTransactionParams struct {
-	TransactionDate   pgtype.Date
-	CFOrgID           pgtype.UUID
-	Description       pgtype.Text
-	Direction         pgtype.Int4
-	Amount            int32
-	TransactionTypeID int32
+	OccurredAt  pgtype.Timestamp
+	Description pgtype.Text
+	Type        TransactionType
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
-	row := q.db.QueryRow(ctx, createTransaction,
-		arg.TransactionDate,
-		arg.CFOrgID,
-		arg.Description,
-		arg.Direction,
-		arg.Amount,
-		arg.TransactionTypeID,
-	)
+	row := q.db.QueryRow(ctx, createTransaction, arg.OccurredAt, arg.Description, arg.Type)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
-		&i.TransactionDate,
-		&i.CFOrgID,
+		&i.OccurredAt,
 		&i.Description,
-		&i.Direction,
-		&i.Amount,
-		&i.TransactionTypeID,
+		&i.Type,
 	)
 	return i, err
 }
 
-const createTransactionType = `-- name: CreateTransactionType :one
-INSERT INTO transaction_type (
-  name
-) VALUES (
-  $1
-)
-RETURNING id, name
-`
-
-func (q *Queries) CreateTransactionType(ctx context.Context, name string) (TransactionType, error) {
-	row := q.db.QueryRow(ctx, createTransactionType, name)
-	var i TransactionType
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
-}
-
-const deleteTransactionType = `-- name: DeleteTransactionType :exec
-DELETE FROM transaction_type
-WHERE id = $1
-`
-
-func (q *Queries) DeleteTransactionType(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, deleteTransactionType, id)
-	return err
-}
-
-const getTransaction = `-- name: GetTransaction :one
-SELECT id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id FROM transaction
+const getTransaction = `-- name: GetTransaction :many
+SELECT id, occurred_at, description, type FROM transaction
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetTransaction(ctx context.Context, id int32) (Transaction, error) {
-	row := q.db.QueryRow(ctx, getTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.TransactionDate,
-		&i.CFOrgID,
-		&i.Description,
-		&i.Direction,
-		&i.Amount,
-		&i.TransactionTypeID,
-	)
-	return i, err
-}
-
-const getTransactionType = `-- name: GetTransactionType :one
-SELECT id, name FROM transaction_type
-WHERE id = $1 LIMIT 1
-`
-
-func (q *Queries) GetTransactionType(ctx context.Context, id int32) (TransactionType, error) {
-	row := q.db.QueryRow(ctx, getTransactionType, id)
-	var i TransactionType
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
-}
-
-const listTransactionTypes = `-- name: ListTransactionTypes :many
-SELECT id, name FROM transaction_type
-ORDER BY name
-`
-
-func (q *Queries) ListTransactionTypes(ctx context.Context) ([]TransactionType, error) {
-	rows, err := q.db.Query(ctx, listTransactionTypes)
+func (q *Queries) GetTransaction(ctx context.Context, id int32) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, getTransaction, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TransactionType
+	var items []Transaction
 	for rows.Next() {
-		var i TransactionType
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.OccurredAt,
+			&i.Description,
+			&i.Type,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -135,7 +69,7 @@ func (q *Queries) ListTransactionTypes(ctx context.Context) ([]TransactionType, 
 }
 
 const listTransactions = `-- name: ListTransactions :many
-SELECT id, transaction_date, cf_org_id, description, direction, amount, transaction_type_id FROM transaction
+SELECT id, occurred_at, description, type FROM transaction
 ORDER BY id
 `
 
@@ -150,12 +84,9 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 		var i Transaction
 		if err := rows.Scan(
 			&i.ID,
-			&i.TransactionDate,
-			&i.CFOrgID,
+			&i.OccurredAt,
 			&i.Description,
-			&i.Direction,
-			&i.Amount,
-			&i.TransactionTypeID,
+			&i.Type,
 		); err != nil {
 			return nil, err
 		}
@@ -167,18 +98,54 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 	return items, nil
 }
 
-const updateTransactionType = `-- name: UpdateTransactionType :exec
-UPDATE transaction_type
-  set name = $2
-  WHERE id = $1
+const listTransactionsWide = `-- name: ListTransactionsWide :many
+SELECT transaction_id, account_id, amount, direction, account.id, customer_id, type, account_type.id, name, normal
+FROM
+  entry
+  LEFT JOIN account ON entry.account_id = account.id
+  LEFT JOIN account_type ON account.type = account_type.id
 `
 
-type UpdateTransactionTypeParams struct {
-	ID   int32
-	Name string
+type ListTransactionsWideRow struct {
+	TransactionID int32
+	AccountID     int32
+	Amount        pgtype.Numeric
+	Direction     pgtype.Int4
+	ID            pgtype.Int4
+	CustomerID    pgtype.Int8
+	Type          pgtype.Int4
+	ID_2          pgtype.Int4
+	Name          pgtype.Text
+	Normal        pgtype.Int4
 }
 
-func (q *Queries) UpdateTransactionType(ctx context.Context, arg UpdateTransactionTypeParams) error {
-	_, err := q.db.Exec(ctx, updateTransactionType, arg.ID, arg.Name)
-	return err
+func (q *Queries) ListTransactionsWide(ctx context.Context) ([]ListTransactionsWideRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsWide)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTransactionsWideRow
+	for rows.Next() {
+		var i ListTransactionsWideRow
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.AccountID,
+			&i.Amount,
+			&i.Direction,
+			&i.ID,
+			&i.CustomerID,
+			&i.Type,
+			&i.ID_2,
+			&i.Name,
+			&i.Normal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

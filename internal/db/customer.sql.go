@@ -10,24 +10,32 @@ import (
 )
 
 const createCustomer = `-- name: CreateCustomer :one
-INSERT INTO customer (
-  id, name
-) VALUES (
-  $1, $2
+WITH cust AS (
+  INSERT INTO customer (
+    name
+  )
+  VALUES ($1)
+  RETURNING id
+),
+types AS (
+  SELECT id
+  FROM account_type
+),
+accts AS (
+  INSERT INTO account (customer_id, type)
+  SELECT cust.id, types.id
+  FROM cust CROSS JOIN types
 )
-RETURNING id, name
+SELECT id
+FROM cust
 `
 
-type CreateCustomerParams struct {
-	ID   int64
-	Name string
-}
-
-func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
-	row := q.db.QueryRow(ctx, createCustomer, arg.ID, arg.Name)
-	var i Customer
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
+// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
+func (q *Queries) CreateCustomer(ctx context.Context, name string) (int64, error) {
+	row := q.db.QueryRow(ctx, createCustomer, name)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteCustomer = `-- name: DeleteCustomer :exec
@@ -41,19 +49,19 @@ func (q *Queries) DeleteCustomer(ctx context.Context, id int64) error {
 }
 
 const getCustomer = `-- name: GetCustomer :one
-SELECT id, name FROM customer
+SELECT id, name, tier_id FROM customer
 WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetCustomer(ctx context.Context, id int64) (Customer, error) {
 	row := q.db.QueryRow(ctx, getCustomer, id)
 	var i Customer
-	err := row.Scan(&i.ID, &i.Name)
+	err := row.Scan(&i.ID, &i.Name, &i.TierID)
 	return i, err
 }
 
 const listCustomers = `-- name: ListCustomers :many
-SELECT id, name FROM customer
+SELECT id, name, tier_id FROM customer
 ORDER BY name
 `
 
@@ -66,7 +74,7 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	var items []Customer
 	for rows.Next() {
 		var i Customer
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		if err := rows.Scan(&i.ID, &i.Name, &i.TierID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

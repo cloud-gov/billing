@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	// Accounting contains convenience queries that may not have practical use in the application.
+	// Output the two sides of the standard accounting equation as two rows, for all defined top-level account types. For instance, if only 'liabilities' and 'expenses' are defined, the output is
+	//   liabilities
+	//   expenses
+	AccountingEquation(ctx context.Context) ([]string, error)
 	// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 	BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error
@@ -22,42 +27,40 @@ type Querier interface {
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
-	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
-	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
+	CreateCustomer(ctx context.Context, name string) (int64, error)
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
 	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
 	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
 	CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error)
-	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
-	CreateTransactionType(ctx context.Context, name string) (TransactionType, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
 	DeleteCustomer(ctx context.Context, id int64) error
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
-	DeleteTransactionType(ctx context.Context, id int32) error
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
-	GetTransaction(ctx context.Context, id int32) (Transaction, error)
-	GetTransactionType(ctx context.Context, id int32) (TransactionType, error)
+	GetTransaction(ctx context.Context, id int32) ([]Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
-	ListTransactionTypes(ctx context.Context) ([]TransactionType, error)
 	ListTransactions(ctx context.Context) ([]Transaction, error)
+	ListTransactionsWide(ctx context.Context) ([]ListTransactionsWideRow, error)
+	// SumEntries calculates the sum of all entries in the ledger. If the result is not 0, a transaction is imbalanced.
+	SumEntries(ctx context.Context) ([]pgtype.Numeric, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
-	UpdateTransactionType(ctx context.Context, arg UpdateTransactionTypeParams) error
 	// UpsertResource upserts a Resource and creates minimal rows in foreign tables -- namely meter, cf_org, and resource_kind -- to which Resource has foreign keys. Efficient for single inserts. For bulk inserts, review Bulk* functions.
 	UpsertResource(ctx context.Context, arg UpsertResourceParams) (Resource, error)
 }

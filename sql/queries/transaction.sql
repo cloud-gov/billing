@@ -3,39 +3,21 @@
 SELECT * FROM transaction
 ORDER BY id;
 
--- name: GetTransaction :one
+-- name: GetTransaction :many
 SELECT * FROM transaction
 WHERE id = $1 LIMIT 1;
 
 -- name: CreateTransaction :one
 INSERT INTO transaction (
-  transaction_date, cf_org_id, description, direction, amount, transaction_type_id
+  occurred_at, description, type
 ) VALUES (
-  $1, $2, $3, $4, $5, $6
+  $1, $2, $3
 )
 RETURNING *;
 
--- name: GetTransactionType :one
-SELECT * FROM transaction_type
-WHERE id = $1 LIMIT 1;
-
--- name: ListTransactionTypes :many
-SELECT * FROM transaction_type
-ORDER BY name;
-
--- name: UpdateTransactionType :exec
-UPDATE transaction_type
-  set name = $2
-  WHERE id = $1;
-
--- name: DeleteTransactionType :exec
-DELETE FROM transaction_type
-WHERE id = $1;
-
--- name: CreateTransactionType :one
-INSERT INTO transaction_type (
-  name
-) VALUES (
-  $1
-)
-RETURNING *;
+-- name: ListTransactionsWide :many
+SELECT *
+FROM
+  entry
+  LEFT JOIN account ON entry.account_id = account.id
+  LEFT JOIN account_type ON account.type = account_type.id;

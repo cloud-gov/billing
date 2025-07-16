@@ -72,3 +72,4 @@ main.go       # Entrypoint for the server program.
 - [Go Wiki: Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)
 - [The Go Blog: Package Names](https://go.dev/blog/package-names)
 - [brandur.org: How We Went All In on sqlc/pgx for Postgres + Go](https://brandur.org/sqlc#caveats)
+- [An Elegant DB Schema for Double-Entry Accounting](https://web.archive.org/web/20220901165809/https://www.journalize.io/blog/an-elegant-db-schema-for-double-entry-accounting) is the basis for the double-entry accounting schema. (Our schema has some differences.)

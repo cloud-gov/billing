@@ -217,3 +217,11 @@ Thumbs.db
 # System and Miscellaneous
 $RECYCLE.BIN/
 $tf/
+
+# Terraform
+*.tfstate
+*.tfvars
+*.tfstate.backup
+
+# Custom
+*.zip

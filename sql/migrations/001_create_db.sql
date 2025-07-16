@@ -1,23 +1,22 @@
-CREATE TABLE customer (
-  id   BIGSERIAL PRIMARY KEY,
-  name text      NOT NULL
-);
-
 CREATE TABLE tier (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   tier_credits BIGINT NOT NULL
 );
 
+CREATE TABLE customer (
+  id   BIGSERIAL PRIMARY KEY,
+  name text      NOT NULL,
+  tier_id INT,
+
+  CONSTRAINT fk_tier_id Foreign Key (tier_id) REFERENCES tier(id)
+);
+
 CREATE TABLE cf_org (
   id UUID PRIMARY KEY, -- TODO, natural_id instead, since it's defined by CF?
   name TEXT NOT NULL,
-  tier_id INT NOT NULL,
-  credits_quota BIGINT NOT NULL,
-  credits_used BIGINT NOT NULL,
   customer_id BIGINT NOT NULL,
-  CONSTRAINT fk_customer_id Foreign Key (customer_id) REFERENCES customer(id),
-  CONSTRAINT fk_tier_id Foreign Key (tier_id) REFERENCES tier(id)
+  CONSTRAINT fk_customer_id Foreign Key (customer_id) REFERENCES customer(id)
 );
 
 CREATE TABLE meter (
