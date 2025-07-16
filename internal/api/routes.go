@@ -94,3 +94,35 @@ func pgxUUID(s string) pgtype.UUID {
 	u.Scan(s)
 	return u
 }
+
+func AdminRoutes(logger *slog.Logger, q db.Querier) http.Handler {
+	mux := chi.NewMux()
+	mux.Mount("/admin", newAdminRouter(logger, q))
+	return mux
+}
+
+type adminHandler struct {
+	Logger  *slog.Logger
+	Queries db.Querier
+}
+
+func newAdminRouter(logger *slog.Logger, q db.Querier) http.Handler {
+	mux := chi.NewMux()
+	h := adminHandler{Logger: logger, Queries: q}
+
+	mux.Post("/tier", h.handleCreateTier)
+
+	return mux
+}
+
+func (h *adminHandler) handleCreateTier(w http.ResponseWriter, r *http.Request) {
+	tier, err := h.Queries.CreateTier(r.Context(), db.CreateTierParams{
+		Name:        "",
+		TierCredits: 0,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, fmt.Sprintf("%v", tier.ID))
+}
