@@ -55,7 +55,9 @@ func run(ctx context.Context, out io.Writer) error {
 	}))
 
 	logger.Debug("run: initializing CF client")
-	cfconf, err := config.NewFromCFHome()
+	cfconf, err := config.New(os.Getenv("CF_API_URL"),
+		config.ClientCredentials(os.Getenv("CF_CLIENT_ID"), os.Getenv("CF_CLIENT_SECRET")),
+		config.SkipTLSValidation())
 	if err != nil {
 		return fmtErr(ErrCFConfig, err)
 	}
