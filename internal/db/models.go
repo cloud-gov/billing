@@ -5,21 +5,88 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// TransactionType explains why the transaction was made. Each means:
+//   - iaa_pop_start: The IAA Period of Performance started.
+//   - iaa_pop_end: The IAA Period of Performance ended.
+//   - usage_post: Customer usage of was posted, i.e. their account balance was updated to reflect their usage.
+type TransactionType string
+
+const (
+	TransactionTypeIaaPopStart TransactionType = "iaa_pop_start"
+	TransactionTypeIaaPopEnd   TransactionType = "iaa_pop_end"
+	TransactionTypeUsagePost   TransactionType = "usage_post"
+)
+
+func (e *TransactionType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TransactionType(s)
+	case string:
+		*e = TransactionType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TransactionType: %T", src)
+	}
+	return nil
+}
+
+type NullTransactionType struct {
+	TransactionType TransactionType
+	Valid           bool // Valid is true if TransactionType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTransactionType) Scan(value interface{}) error {
+	if value == nil {
+		ns.TransactionType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TransactionType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTransactionType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TransactionType), nil
+}
+
+type Account struct {
+	ID         int32
+	CustomerID pgtype.Int8
+	Type       pgtype.Int4
+}
+
+type AccountType struct {
+	ID     int32
+	Name   string
+	Normal pgtype.Int4
+}
+
 type CFOrg struct {
-	ID           pgtype.UUID
-	Name         pgtype.Text
-	TierID       pgtype.Int4
-	CreditsQuota pgtype.Int8
-	CreditsUsed  pgtype.Int8
-	CustomerID   pgtype.Int8
+	ID         pgtype.UUID
+	Name       pgtype.Text
+	CustomerID pgtype.Int8
 }
 
 type Customer struct {
-	ID   int64
-	Name string
+	ID     int64
+	Name   string
+	TierID pgtype.Int4
+}
+
+type Entry struct {
+	TransactionID int32
+	AccountID     int32
+	Amount        pgtype.Numeric
+	Direction     pgtype.Int4
 }
 
 type Measurement struct {
@@ -64,16 +131,8 @@ type Tier struct {
 }
 
 type Transaction struct {
-	ID                int32
-	TransactionDate   pgtype.Date
-	CFOrgID           pgtype.UUID
-	Description       pgtype.Text
-	Direction         pgtype.Int4
-	Amount            int32
-	TransactionTypeID int32
-}
-
-type TransactionType struct {
-	ID   int32
-	Name string
+	ID          int32
+	OccurredAt  pgtype.Timestamp
+	Description pgtype.Text
+	Type        TransactionType
 }

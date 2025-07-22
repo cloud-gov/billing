@@ -44,7 +44,7 @@ func migrateRiver(ctx context.Context, conn *pgxpool.Pool) error {
 
 // migrateTern uses the tern package to execute "up" migrations for the billing service schema.
 func migrateTern(ctx context.Context, conn *pgx.Conn) error {
-	m, err := migrate.NewMigrator(context.Background(), conn, "my_schema_version")
+	m, err := migrate.NewMigrator(context.Background(), conn, "schema_version")
 	if err != nil {
 		return err
 	}
@@ -52,8 +52,8 @@ func migrateTern(ctx context.Context, conn *pgx.Conn) error {
 	if err != nil {
 		return err
 	}
+
 	// If already migrated to latest, this is a noop.
 	err = m.Migrate(ctx)
 	return err
-
 }
