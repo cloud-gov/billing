@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
-	"github.com/cloudfoundry/go-cfclient/v3/config"
+	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/robfig/cron/v3"
 
 	"github.com/cloud-gov/billing/internal/api"
+	"github.com/cloud-gov/billing/internal/config"
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbtx"
 	"github.com/cloud-gov/billing/internal/jobs"
@@ -29,6 +30,7 @@ import (
 )
 
 var (
+	ErrBadConfig        = errors.New("reading config from environment")
 	ErrCFClient         = errors.New("creating Cloud Foundry client")
 	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
 	ErrDBConn           = errors.New("connecting to database")
@@ -55,15 +57,18 @@ func run(ctx context.Context, out io.Writer) error {
 	}))
 
 	logger.Debug("run: initializing CF client")
-	cfconf, err := config.New(os.Getenv("CF_API_URL"),
-		config.ClientCredentials(os.Getenv("CF_CLIENT_ID"), os.Getenv("CF_CLIENT_SECRET")),
-		config.SkipTLSValidation())
+	c, err := config.New()
+	if err != nil {
+		return fmtErr(ErrBadConfig, err)
+	}
+	cfconf, err := cfconfig.New(c.ApiUrl,
+		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {
 		return fmtErr(ErrCFConfig, err)
 	}
 	cfclient, err := client.New(cfconf)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrCFClient, err)
+		return fmtErr(ErrCFClient, err)
 	}
 
 	logger.Debug("run: initializing database")
