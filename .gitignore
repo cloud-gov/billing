@@ -179,7 +179,7 @@ manifest-*.yml
 *.sqlite
 *.sqlite3
 /log/
-*.env*
+*.env
 **/log/*.log
 **/log/*.log*
 
