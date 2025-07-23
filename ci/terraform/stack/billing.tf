@@ -31,9 +31,12 @@ resource "cloudfoundry_app" "billing" {
   memory     = "128M"
   disk_quota = "2G"
 
-  environment = {
-    "GOVERSION" = "1.24"
-  }
+  environment = merge(
+    {
+      "GOVERSION" = "1.24"
+    },
+    var.environment
+  )
 
   routes = [{
     route = local.billing_route
