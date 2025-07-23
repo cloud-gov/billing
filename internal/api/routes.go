@@ -8,26 +8,27 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
+	"github.com/cloud-gov/billing/internal/api/middleware"
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/jobs"
 )
 
-// routes registers all routes for the server.
+// Routes registers all customer-facing HTTP routes for the server.
 func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx]) http.Handler {
 	mux := chi.NewMux()
-	mux.Use(middleware.Logger)
+	mux.Use(chimiddleware.Logger)
 	mux.Handle("/usage/job", handleUsageJob(riverc))
 	mux.Handle("/usage/app/{guid}", handleUsageApp(logger, cf, q))
 	return mux
 }
 
-// TODO, how to correctly parameterize the river client?
 func handleUsageJob(riverc *river.Client[pgx.Tx]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		result, err := riverc.Insert(r.Context(), jobs.MeasureUsageArgs{}, nil)
@@ -95,8 +96,10 @@ func pgxUUID(s string) pgtype.UUID {
 	return u
 }
 
-func AdminRoutes(logger *slog.Logger, q db.Querier) http.Handler {
+func AdminRoutes(logger *slog.Logger, q db.Querier, verifier *oidc.IDTokenVerifier) http.Handler {
 	mux := chi.NewMux()
+	hasScope := middleware.NewHasScope(logger, verifier, "usage.admin")
+	mux.Use(hasScope)
 	mux.Mount("/admin", newAdminRouter(logger, q))
 	return mux
 }

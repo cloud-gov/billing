@@ -13,6 +13,7 @@ import (
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
@@ -33,8 +34,10 @@ var (
 	ErrBadConfig        = errors.New("reading config from environment")
 	ErrCFClient         = errors.New("creating Cloud Foundry client")
 	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
+	ErrCrontab          = errors.New("parsing crontab for periodic job execution")
 	ErrDBConn           = errors.New("connecting to database")
 	ErrDBMigration      = errors.New("migrating the database")
+	ErrOIDCProvider     = errors.New("discovering OIDC provider")
 	ErrRiverClientNew   = errors.New("creating River client")
 	ErrRiverClientStart = errors.New("starting River client")
 )
@@ -61,7 +64,7 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmtErr(ErrBadConfig, err)
 	}
-	cfconf, err := cfconfig.New(c.ApiUrl,
+	cfconf, err := cfconfig.New(c.CFApiUrl,
 		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {
 		return fmtErr(ErrCFConfig, err)
@@ -92,18 +95,20 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 	rdr := reader.New(meters)
 
+	logger.Debug("run: initializing OIDC provider for JWT verification")
+	oidcProvider, err := oidc.NewProvider(ctx, c.Issuer)
+	if err != nil {
+		return fmtErr(ErrOIDCProvider, err)
+	}
+	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId}) // todo check alg
+
 	logger.Debug("run: initializing River workers and client")
 	workers := river.NewWorkers()
-
-	usageWorker, err := jobs.NewMeasureUsageWorker(logger, conn, q, rdr)
-	if err != nil {
-		return err
-	}
-	river.AddWorker(workers, usageWorker)
+	river.AddWorker(workers, jobs.NewMeasureUsageWorker(logger, conn, q, rdr))
 
 	schedule, err := cron.ParseStandard("1 * * * *") // Read usage every hour, one minute after the hour.
 	if err != nil {
-		return err // todo
+		return ErrCrontab
 	}
 	riverc, err := river.NewClient(riverpgxv5.New(conn), &river.Config{
 		JobTimeout: 10 * time.Minute,
@@ -136,7 +141,7 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: starting web server")
 
 	// Admin routes are internal only and served on a different port.
-	adminSrv := server.New("", "8081", api.AdminRoutes(logger, q), logger)
+	adminSrv := server.New("", "8081", api.AdminRoutes(logger, q, verifier), logger)
 	go adminSrv.ListenAndServe(ctx)
 
 	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc), logger)
