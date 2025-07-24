@@ -1,9 +1,6 @@
 terraform {
-  backend "local" {
-
+  backend "s3" {
   }
-  # backend "s3" {
-  # }
 }
 
 provider "cloudfoundry" {

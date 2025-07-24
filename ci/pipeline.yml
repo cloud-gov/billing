@@ -31,13 +31,13 @@ jobs:
           AWS_DEFAULT_REGION: ((aws-region))
           AWS_USE_FIPS_ENDPOINT: true
           CF_API_URL: ((dev-cf-api-url))
-          CF_CLIENT_ID: ((deploy-billing-cf-client-id-development))
+          CF_CLIENT_ID: ((deploy-billing-cf-client-id))
           CF_CLIENT_SECRET: ((deploy-billing-cf-client-secret-development))
           TF_UPDATE_PLUGIN_CACHE: true
           TF_VAR_base_domain: ((base-domain-development))
           TF_VAR_environment: # TODO see if an object works here
             CF_API_URL: ((dev-cf-api-url))
-            CF_CLIENT_ID: ((billing-cf-client-id-development))
+            CF_CLIENT_ID: ((billing-cf-client-id))
             CF_CLIENT_SECRET: ((billing-cf-client-secret-development))
           TF_VAR_org_name: ((org-name))
           TF_VAR_path: src
@@ -72,7 +72,7 @@ jobs:
         file: terraform-templates/ci/terraform/terraform-cleanup.yml
         params:
           CF_API_URL: ((dev-cf-api-url))
-          CF_CLIENT_ID: ((deploy-billing-cf-client-id-development))
+          CF_CLIENT_ID: ((deploy-billing-cf-client-id))
           CF_CLIENT_SECRET: ((deploy-billing-cf-client-secret-development))
 
 resources:
