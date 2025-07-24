@@ -5,8 +5,8 @@ set -eo pipefail
 
 aws_rds_credentials=$(echo $VCAP_SERVICES | jq '."aws-rds"[0].credentials')
 
-export PGDATABASE=$(echo $aws_rds_credentials | jq '.db_name')
-export PGHOST=$(echo $aws_rds_credentials | jq '.host')
-export PGPORT=$(echo $aws_rds_credentials | jq '.port')
-export PGUSER=$(echo $aws_rds_credentials | jq '.username')
-export PGPASSWORD=$(echo $aws_rds_credentials | jq '.password')
+export PGDATABASE=$(echo $aws_rds_credentials | jq -r '.db_name')
+export PGHOST=$(echo $aws_rds_credentials | jq -r '.host')
+export PGPORT=$(echo $aws_rds_credentials | jq -r '.port')
+export PGUSER=$(echo $aws_rds_credentials | jq -r '.username')
+export PGPASSWORD=$(echo $aws_rds_credentials | jq -r '.password')
