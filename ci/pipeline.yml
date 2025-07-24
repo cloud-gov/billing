@@ -39,6 +39,7 @@ jobs:
             CF_API_URL: ((dev-cf-api-url))
             CF_CLIENT_ID: ((billing-cf-client-id))
             CF_CLIENT_SECRET: ((billing-cf-client-secret-development))
+            OIDC_ISSUER: ((oidc-issuer-development))
           TF_VAR_org_name: ((org-name))
           TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
           TF_VAR_space_name: ((space-name))

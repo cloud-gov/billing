@@ -139,12 +139,7 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 
 	logger.Debug("run: starting web server")
-
-	// Admin routes are internal only and served on a different port.
-	adminSrv := server.New("", "8081", api.AdminRoutes(logger, q, verifier), logger)
-	go adminSrv.ListenAndServe(ctx)
-
-	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc), logger)
+	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc, verifier), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }

@@ -25,6 +25,7 @@ require (
 	github.com/cubicdaiya/gonp v1.0.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
+	github.com/go-chi/httplog/v3 v3.2.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/google/cel-go v0.24.1 // indirect
