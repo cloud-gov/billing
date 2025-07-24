@@ -46,6 +46,35 @@ jobs:
         params:
           file: updated-terraform-plugin-cache/cache.tar.gz
 
+  - name: terraform-apply-billing-development
+    plan:
+      - in_parallel:
+          - get: terraform-plugin-cache
+            trigger: false
+          - get: terraform-templates
+            resource: terraform-config
+            trigger: true # Changes to the terraform deployment code trigger a rebuild
+          - get: src
+            resource: src
+            trigger: false # Pipeline changes do not automatically trigger a rebuild
+            passed: [terraform-plan-billing-development]
+          - get: pipeline-tasks
+          - get: general-task
+      - task: terraform-apply
+        image: general-task
+        file: terraform-templates/ci/terraform/terraform-apply.yml
+        params:
+          <<: *tf-billing-development
+          TF_UPDATE_PLUGIN_CACHE: false
+          TERRAFORM_ACTION: apply
+      - task: terraform-cleanup
+        image: general-task
+        file: terraform-templates/ci/terraform/terraform-cleanup.yml
+        params:
+          CF_API_URL: ((dev-cf-api-url))
+          CF_CLIENT_ID: ((deploy-billing-cf-client-id-development))
+          CF_CLIENT_SECRET: ((deploy-billing-cf-client-secret-development))
+
 resources:
   - name: pipeline-tasks
     type: git
