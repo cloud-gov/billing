@@ -2,9 +2,10 @@
 platform: linux
 
 inputs:
+  - name: pipeline-tasks
+  - name: src
   - name: terraform-plugin-cache
   - name: terraform-templates
-  - name: pipeline-tasks
 outputs:
   - name: terraform-state
   - name: updated-terraform-plugin-cache
