@@ -31,5 +31,6 @@ variable "environment" {
     CF_API_URL       = string
     CF_CLIENT_ID     = string
     CF_CLIENT_SECRET = string
+    OIDC_ISSUER      = string
   })
 }

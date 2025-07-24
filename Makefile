@@ -42,6 +42,14 @@ watch:
 		sleep 0.5 ; \
 	done
 
+.PHONY: watchtest
+watchtest:
+	@echo "Running unit tests every time .go files change. Press ctrl+c *twice* to exit, or once to rebuild."
+	@while true; do \
+		sleep 0.5 ; \
+		set -a; source docker.env; set +a; find . -type f -name '*.go' | entr -d go test ./... ; \
+	done
+
 .PHONY: clean
 clean: db-down
 	go clean
@@ -66,3 +74,7 @@ migrate: db-init
 .PHONY: db-reset
 db-reset: db-drop db-init migrate
 	@echo "Database reset. Restart app to reconnect."
+
+.PHONY: psql
+psql:
+	@set -a; source docker.env; set +a; psql
