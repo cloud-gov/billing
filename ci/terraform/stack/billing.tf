@@ -61,6 +61,6 @@ resource "cloudfoundry_service_instance" "db" {
 
   # Prevent deleting the database by accident.
   lifecycle {
-    prevent_destroy = false
+    prevent_destroy = true
   }
 }
