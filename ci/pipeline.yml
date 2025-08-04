@@ -13,7 +13,7 @@ jobs:
             trigger: false
           - get: terraform-templates
             resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
+            trigger: false
           - get: src
             resource: src
             trigger: true # App code changes trigger a rebuild
@@ -54,10 +54,10 @@ jobs:
             trigger: false
           - get: terraform-templates
             resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
+            trigger: false
           - get: src
             resource: src
-            trigger: true # Pipeline changes do not automatically trigger a rebuild
+            trigger: true
             passed: [terraform-plan-billing-development]
           - get: pipeline-tasks
           - get: general-task
@@ -83,10 +83,10 @@ jobs:
             trigger: false
           - get: terraform-templates
             resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
+            trigger: false
           - get: src
             resource: src
-            trigger: true # App code changes trigger a rebuild
+            trigger: true
             passed: [terraform-apply-billing-development]
           - get: pipeline-tasks
           - get: general-task
@@ -121,10 +121,10 @@ jobs:
             trigger: false
           - get: terraform-templates
             resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
+            trigger: false
           - get: src
             resource: src
-            trigger: true # Pipeline changes do not automatically trigger a rebuild
+            trigger: true
             passed: [terraform-plan-billing-staging]
           - get: pipeline-tasks
           - get: general-task
