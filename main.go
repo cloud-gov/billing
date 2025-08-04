@@ -102,7 +102,7 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmtErr(ErrOIDCProvider, err)
 	}
-	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId}) // todo check alg
+	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId})
 
 	logger.Debug("run: initializing River workers and client")
 	riverc, err := jobs.NewClient(conn, logger, q, rdr)

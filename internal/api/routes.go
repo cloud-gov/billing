@@ -21,7 +21,7 @@ import (
 	"github.com/cloud-gov/billing/internal/jobs"
 )
 
-// Routes registers all customer-facing HTTP routes for the server.
+// Routes registers all public HTTP routes for the server.
 func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier, config config.Config) http.Handler {
 	mux := chi.NewMux()
 	mux.Use(httplog.RequestLogger(logger, &httplog.Options{
