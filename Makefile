@@ -56,7 +56,7 @@ debug-test-db:
 watchgen:
 	@echo "Watching for .sql file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
-		find . -type f -name '*.sql' | entr -d make gen ; \
+		find . -type f \( -name '*.sql' -o -name 'openapi.yaml' \)  | entr -d make gen ; \
 		sleep 0.5 ; \
 	done
 
