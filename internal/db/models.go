@@ -83,22 +83,31 @@ type Customer struct {
 }
 
 type Entry struct {
-	TransactionID int32
-	AccountID     int32
-	Amount        pgtype.Numeric
-	Direction     pgtype.Int4
+	TransactionID      int32
+	AccountID          int32
+	Direction          pgtype.Int4
+	AmountMicrocredits pgtype.Int8
 }
 
 type Measurement struct {
-	ReadingID         int32
-	Meter             string
-	ResourceNaturalID string
-	Value             int32
+	ReadingID          int32
+	Meter              string
+	ResourceNaturalID  string
+	Value              int32
+	AmountMicrocredits pgtype.Int8
 }
 
 // A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
 type Meter struct {
 	Name string
+}
+
+type Price struct {
+	Meter               string
+	NaturalID           string
+	UnitOfMeasure       pgtype.Text
+	MicrocreditsPerUnit pgtype.Int8
+	ValidDuring         pgtype.Range[pgtype.Timestamptz]
 }
 
 type Reading struct {
@@ -117,11 +126,8 @@ type Resource struct {
 
 // ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.
 type ResourceKind struct {
-	Meter         string
-	NaturalID     string
-	Credits       pgtype.Int4
-	Amount        pgtype.Int4
-	UnitOfMeasure pgtype.Text
+	Meter     string
+	NaturalID string
 }
 
 type Tier struct {

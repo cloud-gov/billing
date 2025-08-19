@@ -13,7 +13,7 @@ import (
 
 const sumEntries = `-- name: SumEntries :many
 SELECT
-  sum(direction * amount)
+  sum(direction * amount_microcredits / 1e6)
 FROM
   entry
 `
