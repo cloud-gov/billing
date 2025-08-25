@@ -90,11 +90,15 @@ type Entry struct {
 }
 
 type Measurement struct {
-	ReadingID          int32
-	Meter              string
-	ResourceNaturalID  string
-	Value              int32
+	ReadingID         int32
+	Meter             string
+	ResourceNaturalID string
+	Value             int32
+	// AmountMicrocredits is a denormalized column that is calculated from the Price of the ResourceKind that was applicable when the measurement was taken (based on the time of the Reading). The value is persisted here for simpler rollups and auditing.
 	AmountMicrocredits pgtype.Int8
+	// TransactionID is the transaction that accounts for this usage, typically a "post usage" transaction.
+	TransactionID pgtype.Int8
+	PriceID       pgtype.Int8
 }
 
 // A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
@@ -103,8 +107,9 @@ type Meter struct {
 }
 
 type Price struct {
+	ID                  int32
 	Meter               string
-	NaturalID           string
+	KindNaturalID       string
 	UnitOfMeasure       pgtype.Text
 	MicrocreditsPerUnit pgtype.Int8
 	ValidDuring         pgtype.Range[pgtype.Timestamptz]
@@ -128,6 +133,7 @@ type Resource struct {
 type ResourceKind struct {
 	Meter     string
 	NaturalID string
+	Name      pgtype.Text
 }
 
 type Tier struct {

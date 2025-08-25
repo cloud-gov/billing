@@ -58,6 +58,8 @@ type Querier interface {
 	SumEntries(ctx context.Context) ([]pgtype.Numeric, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
+	// UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
+	UpdateMeasurementMicrocredits(ctx context.Context, asOf pgtype.Timestamptz) (pgtype.Int8, error)
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
 	// UpsertResource upserts a Resource and creates minimal rows in foreign tables -- namely meter, cf_org, and resource_kind -- to which Resource has foreign keys. Efficient for single inserts. For bulk inserts, review Bulk* functions.

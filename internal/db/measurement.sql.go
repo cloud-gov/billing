@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const bulkCreateMeasurement = `-- name: BulkCreateMeasurement :exec
@@ -46,4 +48,17 @@ type CreateMeasurementsParams struct {
 	Meter             string
 	ResourceNaturalID string
 	Value             int32
+}
+
+const updateMeasurementMicrocredits = `-- name: UpdateMeasurementMicrocredits :one
+SELECT update_measurement_microcredits
+FROM update_measurement_microcredits($1)
+`
+
+// UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
+func (q *Queries) UpdateMeasurementMicrocredits(ctx context.Context, asOf pgtype.Timestamptz) (pgtype.Int8, error) {
+	row := q.db.QueryRow(ctx, updateMeasurementMicrocredits, asOf)
+	var update_measurement_microcredits pgtype.Int8
+	err := row.Scan(&update_measurement_microcredits)
+	return update_measurement_microcredits, err
 }
