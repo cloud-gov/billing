@@ -71,6 +71,11 @@ db-migrate: db-init
 	@# Migrate River schema to latest.
 	@set -a; source docker.env; set +a; go tool river migrate-up
 
+.PHONY: db-remigrate
+db-remigrate: db-init
+	@# Redo the latest migration in Tern.
+	@set -a; source docker.env; set +a; go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
+
 .PHONY: db-reset
 db-reset: db-drop db-init db-migrate
 	@echo "Database reset. Restart app to reconnect."
