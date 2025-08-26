@@ -19,7 +19,7 @@ build: gen
 
 .PHONY: test
 test: gen
-	go test ./...
+	go test ./... -skip TestDB
 
 .PHONY: debug
 debug: gen
@@ -91,3 +91,9 @@ db-schema:
 	| grep --invert-match "\-\-" \
 	| cat -s \
 	> sql/schema/generated.sql
+
+.PHONY: test-db
+test-db: db-down db-up db-migrate
+	@echo "Running database tests (TestDB*)..."
+	@set -a; source docker.env; set +a; go test ./... -run TestDB
+

@@ -27,6 +27,28 @@ func (q *Queries) CreateReading(ctx context.Context, createdAt pgtype.Timestamp)
 	return i, err
 }
 
+const createReadingWithID = `-- name: CreateReadingWithID :one
+INSERT INTO reading (
+	id, created_at, periodic
+) VALUES (
+	$1, $2, $3
+)
+RETURNING id, created_at, periodic
+`
+
+type CreateReadingWithIDParams struct {
+	ID        int32
+	CreatedAt pgtype.Timestamp
+	Periodic  bool
+}
+
+func (q *Queries) CreateReadingWithID(ctx context.Context, arg CreateReadingWithIDParams) (Reading, error) {
+	row := q.db.QueryRow(ctx, createReadingWithID, arg.ID, arg.CreatedAt, arg.Periodic)
+	var i Reading
+	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
+	return i, err
+}
+
 const createUniqueReading = `-- name: CreateUniqueReading :one
 INSERT INTO reading (
     created_at, periodic

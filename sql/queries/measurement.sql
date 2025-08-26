@@ -1,3 +1,13 @@
+-- name: CreateMeasurement :one
+INSERT INTO measurement (
+	reading_id,
+	meter,
+	resource_natural_id,
+	value
+) VALUES (
+	$1, $2, $3, $4
+) RETURNING *;
+
 -- name: CreateMeasurements :copyfrom
 INSERT INTO measurement (
 	reading_id,

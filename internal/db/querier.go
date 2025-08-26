@@ -27,10 +27,15 @@ type Querier interface {
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
+	CreateCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
 	CreateCustomer(ctx context.Context, name string) (int64, error)
+	CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error)
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
+	CreateMeter(ctx context.Context, name string) (string, error)
+	CreatePriceWithID(ctx context.Context, arg CreatePriceWithIDParams) (Price, error)
 	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
+	CreateReadingWithID(ctx context.Context, arg CreateReadingWithIDParams) (Reading, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)

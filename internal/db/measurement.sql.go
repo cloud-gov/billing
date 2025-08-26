@@ -43,6 +43,44 @@ func (q *Queries) BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasu
 	return err
 }
 
+const createMeasurement = `-- name: CreateMeasurement :one
+INSERT INTO measurement (
+	reading_id,
+	meter,
+	resource_natural_id,
+	value
+) VALUES (
+	$1, $2, $3, $4
+) RETURNING reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
+`
+
+type CreateMeasurementParams struct {
+	ReadingID         int32
+	Meter             string
+	ResourceNaturalID string
+	Value             int32
+}
+
+func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error) {
+	row := q.db.QueryRow(ctx, createMeasurement,
+		arg.ReadingID,
+		arg.Meter,
+		arg.ResourceNaturalID,
+		arg.Value,
+	)
+	var i Measurement
+	err := row.Scan(
+		&i.ReadingID,
+		&i.Meter,
+		&i.ResourceNaturalID,
+		&i.Value,
+		&i.AmountMicrocredits,
+		&i.TransactionID,
+		&i.PriceID,
+	)
+	return i, err
+}
+
 type CreateMeasurementsParams struct {
 	ReadingID         int32
 	Meter             string

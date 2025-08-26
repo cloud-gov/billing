@@ -50,6 +50,12 @@ Tips:
   - River job args are serialized to JSON, stored in the database, and deserialized to be run; dependencies like API clients and loggers may not fully serialize their internal state, resulting in nil pointer panics when they are unmarshalled and used.
   - Additionally, dependencies may have sensitive internal information that should not be persisted to the database.
 
+### Testing
+
+Tests follow these naming conventions:
+
+- `TestDB*`: Database tests. Run with `make test-db`, which starts a fresh postgres Docker instance and migrates it to the latest migration.
+
 ## Packages
 
 The program has the following structure:
