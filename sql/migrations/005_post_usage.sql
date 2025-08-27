@@ -97,6 +97,7 @@ BEGIN
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
 		WHERE ps <= (rd.created_at at time zone 'utc')
 		AND (rd.created_at at time zone 'utc') < pe
+		AND m.amount_microcredits IS NULL
 		GROUP BY
 			r.meter,
 			r.natural_id,
