@@ -64,6 +64,9 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmtErr(ErrBadConfig, err)
 	}
+	if c.DebugDisableAuth {
+		logger.Warn("running with API authentication disabled")
+	}
 	cfconf, err := cfconfig.New(c.CFApiUrl,
 		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {
@@ -139,7 +142,7 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 
 	logger.Debug("run: starting web server")
-	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc, verifier), logger)
+	srv := server.New("", "8080", api.Routes(logger, cfclient, q, riverc, verifier, c), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }
