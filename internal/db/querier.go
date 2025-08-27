@@ -16,6 +16,8 @@ type Querier interface {
 	//   liabilities
 	//   expenses
 	AccountingEquation(ctx context.Context) ([]string, error)
+	// BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
+	BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) (BoundsMonthPrevRow, error)
 	// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 	BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error
@@ -34,7 +36,7 @@ type Querier interface {
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
 	CreateMeter(ctx context.Context, name string) (string, error)
 	CreatePriceWithID(ctx context.Context, arg CreatePriceWithIDParams) (Price, error)
-	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
+	CreateReading(ctx context.Context, arg CreateReadingParams) (Reading, error)
 	CreateReadingWithID(ctx context.Context, arg CreateReadingWithIDParams) (Reading, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
@@ -54,6 +56,7 @@ type Querier interface {
 	GetTransaction(ctx context.Context, id int32) ([]Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListMeasurements(ctx context.Context) ([]Measurement, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)

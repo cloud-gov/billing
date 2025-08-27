@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const boundsMonthPrev = `-- name: BoundsMonthPrev :one
+SELECT period_start, period_end
+FROM bounds_month_prev($1)
+`
+
+type BoundsMonthPrevRow struct {
+	PeriodStart pgtype.Timestamptz
+	PeriodEnd   pgtype.Timestamptz
+}
+
+// BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
+func (q *Queries) BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) (BoundsMonthPrevRow, error) {
+	row := q.db.QueryRow(ctx, boundsMonthPrev, asOf)
+	var i BoundsMonthPrevRow
+	err := row.Scan(&i.PeriodStart, &i.PeriodEnd)
+	return i, err
+}
+
 const bulkCreateMeasurement = `-- name: BulkCreateMeasurement :exec
 INSERT INTO measurement (
 	reading_id,
@@ -86,6 +104,39 @@ type CreateMeasurementsParams struct {
 	Meter             string
 	ResourceNaturalID string
 	Value             int32
+}
+
+const listMeasurements = `-- name: ListMeasurements :many
+SELECT reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
+FROM measurement
+`
+
+func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
+	rows, err := q.db.Query(ctx, listMeasurements)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Measurement
+	for rows.Next() {
+		var i Measurement
+		if err := rows.Scan(
+			&i.ReadingID,
+			&i.Meter,
+			&i.ResourceNaturalID,
+			&i.Value,
+			&i.AmountMicrocredits,
+			&i.TransactionID,
+			&i.PriceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateMeasurementMicrocredits = `-- name: UpdateMeasurementMicrocredits :one

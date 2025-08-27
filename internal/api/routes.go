@@ -90,11 +90,15 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 		}
 
 		logger.Debug("api: creating reading")
-		reading, err := q.CreateReading(ctx, pgtype.Timestamp{Time: time.Now().UTC(), Valid: true})
+		reading, err := q.CreateUniqueReading(ctx, db.CreateUniqueReadingParams{
+			CreatedAt: pgtype.Timestamp{Time: time.Now().UTC(), Valid: true},
+			Periodic:  false,
+		})
 		if err != nil {
 			http.Error(w, "creating reading: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		logger.Debug("api: upserting resource")
 		resource, err := q.UpsertResource(ctx, db.UpsertResourceParams{
 			NaturalID:     app.GUID,
@@ -119,7 +123,7 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 			http.Error(w, "creating measurement: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		_, _ = io.WriteString(w, "Created measurement.\n")
+		_, _ = io.WriteString(w, "Created reading.\n")
 	})
 }
 

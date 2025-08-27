@@ -7,6 +7,13 @@ SET amount_microcredits = amount * 1e6;
 ALTER TABLE entry
 DROP COLUMN amount;
 
+ALTER TABLE reading
+ADD COLUMN created_at_utc timestamptz
+GENERATED ALWAYS AS (created_at AT TIME ZONE 'UTC') STORED;
+COMMENT ON COLUMN reading.created_at_utc IS 'CreatedAtUTC supplements CreatedAt, which does not have a timezone. Values must be inserted into CreatedAt in UTC by the client. CreatedAt has a unique index on it to enforce readings being taken at most hourly. Because the index uses functions that are not volatility level IMMUTABLE, it cannot be used on a column with a timezone; hence the supplementary generated column.';
+COMMENT ON COLUMN reading.created_at IS 'CreatedAt must be a time in UTC.';
+CREATE INDEX ON reading (created_at);
+
 ALTER TABLE measurement
 ADD COLUMN amount_microcredits bigint,
 ADD COLUMN transaction_id bigint,
@@ -65,43 +72,58 @@ CREATE OR REPLACE FUNCTION update_measurement_microcredits(
 	as_of timestamptz DEFAULT now()
 )
 RETURNS bigint
-LANGUAGE plpgsql IMMUTABLE
+LANGUAGE plpgsql
 AS $$
 DECLARE
 	ps timestamptz;
 	pe timestamptz;
+	updated bigint;
 BEGIN
-	SELECT period_start, period_end into ps, pe from bounds_month_prev(as_of);
+	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
 
 	WITH measurement_amounts AS (
-		SELECT r.meter AS meter, r.natural_id AS resource_natural_id, rd.id AS reading_id, sum(p.microcredits_per_unit * m.value) AS amount_microcredits, p.id AS price_id
-		FROM bounds b
-		JOIN reading rd
-		ON b.period_start <= rd.created_at
-		AND rd.created_at < b.period_end
+		SELECT
+			r.meter AS meter,
+			r.natural_id AS resource_natural_id,
+			rd.id AS reading_id,
+			sum(p.microcredits_per_unit * m.value) AS amount_microcredits,
+			p.id AS price_id
+		FROM reading rd
 		JOIN measurement AS m
 		ON rd.id = m.reading_id
 		JOIN resource AS r
 		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
 		JOIN price AS p
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
-		GROUP BY r.meter, r.natural_id, p.id
+		WHERE ps <= (rd.created_at at time zone 'utc')
+		AND (rd.created_at at time zone 'utc') < pe
+		GROUP BY
+			r.meter,
+			r.natural_id,
+			rd.id,
+			p.id
+	),
+	update_measurements AS (
+		UPDATE measurement AS m
+		SET
+			amount_microcredits = ma.amount_microcredits,
+			price_id = ma.price_id
+		FROM measurement_amounts AS ma
+		WHERE
+			m.meter = ma.meter AND
+			m.resource_natural_id = ma.resource_natural_id AND
+			m.reading_id = ma.reading_id
+		RETURNING 1
 	)
-	UPDATE measurement m
-	SET
-		m.amount_microcredits = ma.amount_microcredits,
-		m.price_id = ma.price_id
-	FROM measurement_amounts AS ma
-	WHERE
-		m.meter = ma.meter AND
-		m.resource_natural_id = ma.resource_natural_id AND
-		m.reading_id = ma.reading_id
-	RETURNING count(m);
+	SELECT count(*) INTO updated FROM update_measurements;
+	RETURN updated;
 END $$;
 
 -- TODO create indexes
 
 ---- create above / drop below ----
+ALTER TABLE reading
+ALTER COLUMN created_at TYPE timestamp;
 
 ALTER TABLE entry
 ADD COLUMN amount NUMERIC(20,4) NOT NULL;

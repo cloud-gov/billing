@@ -80,38 +80,42 @@ CREATE FUNCTION public.river_job_state_in_bitmask(bitmask bit, state public.rive
 $$;
 
 CREATE FUNCTION public.update_measurement_microcredits(as_of timestamp with time zone DEFAULT now()) RETURNS bigint
-    LANGUAGE plpgsql IMMUTABLE
+    LANGUAGE plpgsql
     AS $$
 DECLARE
 	ps timestamptz;
 	pe timestamptz;
+	updated bigint;
 BEGIN
 	SELECT period_start, period_end into ps, pe from bounds_month_prev(as_of);
 
 	WITH measurement_amounts AS (
 		SELECT r.meter AS meter, r.natural_id AS resource_natural_id, rd.id AS reading_id, sum(p.microcredits_per_unit * m.value) AS amount_microcredits, p.id AS price_id
-		FROM bounds b
-		JOIN reading rd
-		ON b.period_start <= rd.created_at
-		AND rd.created_at < b.period_end
+		FROM reading rd
 		JOIN measurement AS m
 		ON rd.id = m.reading_id
 		JOIN resource AS r
 		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
 		JOIN price AS p
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
-		GROUP BY r.meter, r.natural_id, p.id
+		WHERE ps <= rd.created_at
+		AND rd.created_at < pe
+		GROUP BY r.meter, r.natural_id, rd.id, p.id
+	),
+	update_measurements AS (
+		UPDATE measurement AS m
+		SET
+			amount_microcredits = ma.amount_microcredits,
+			price_id = ma.price_id
+		FROM measurement_amounts AS ma
+		WHERE
+			m.meter = ma.meter AND
+			m.resource_natural_id = ma.resource_natural_id AND
+			m.reading_id = ma.reading_id
+		RETURNING 1
 	)
-	UPDATE measurement m
-	SET
-		m.amount_microcredits = ma.amount_microcredits,
-		m.price_id = ma.price_id
-	FROM measurement_amounts AS ma
-	WHERE
-		m.meter = ma.meter AND
-		m.resource_natural_id = ma.resource_natural_id AND
-		m.reading_id = ma.reading_id
-	RETURNING count(m);
+	SELECT count(*) INTO updated FROM update_measurements;
+	RETURN updated;
 END $$;
 
 SET default_tablespace = '';
@@ -211,10 +215,13 @@ ALTER SEQUENCE public.price_id_seq OWNED BY public.price.id;
 CREATE TABLE public.reading (
     id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    periodic boolean NOT NULL
+    periodic boolean NOT NULL,
+    created_at_utc timestamp with time zone GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC'::text)) STORED
 );
 
 COMMENT ON COLUMN public.reading.periodic IS 'Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.';
+
+COMMENT ON COLUMN public.reading.created_at_utc IS 'CreatedAtUTC supplements ';
 
 CREATE SEQUENCE public.reading_id_seq
     AS integer
@@ -336,6 +343,8 @@ COMMENT ON INDEX public.idx_resource_kind_meter_natural_id IS 'Enables efficient
 CREATE UNIQUE INDEX idx_resource_meter_natural_id ON public.resource USING btree (meter, natural_id);
 
 COMMENT ON INDEX public.idx_resource_meter_natural_id IS 'Enables efficient deduplicated inserts using BulkCreateResources function.';
+
+CREATE INDEX reading_created_at_idx ON public.reading USING btree (created_at);
 
 CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
 

@@ -31,12 +31,22 @@ type stubQuerier struct {
 
 var ExpectedErr = errors.New("this error was expected")
 
-func (s *stubQuerier) CreateReading(_ context.Context, ts pgtype.Timestamp) (db.Reading, error) {
+func (s *stubQuerier) CreateReading(_ context.Context, arg db.CreateReadingParams) (db.Reading, error) {
 	if s.errOn == "CreateReading" {
 		return db.Reading{}, ExpectedErr
 	}
-	s.createReadingTS = ts
+	s.createReadingTS = arg.CreatedAt
 	return db.Reading{ID: 1}, nil
+}
+func (s *stubQuerier) CreateUniqueReading(_ context.Context, arg db.CreateUniqueReadingParams) (db.Reading, error) {
+	if s.errOn == "CreateReading" {
+		return db.Reading{}, ExpectedErr
+	}
+	s.createReadingTS = arg.CreatedAt
+	return db.Reading{ID: 1}, nil
+}
+func (s *stubQuerier) BoundsMonthPrev(_ context.Context, asOf pgtype.Timestamptz) (db.BoundsMonthPrevRow, error) {
+	panic("unimplemented")
 }
 func (s *stubQuerier) BulkCreateMeters(_ context.Context, meters []string) error {
 	if s.errOn == "BulkCreateMeters" {
@@ -110,9 +120,6 @@ func (s *stubQuerier) CreateTier(_ context.Context, arg db.CreateTierParams) (db
 func (s *stubQuerier) CreateTransaction(_ context.Context, arg db.CreateTransactionParams) (db.Transaction, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CreateUniqueReading(_ context.Context, arg db.CreateUniqueReadingParams) (db.Reading, error) {
-	panic("unimplemented")
-}
 func (s *stubQuerier) DeleteCFOrg(_ context.Context, id pgtype.UUID) error {
 	panic("unimplemented")
 }
@@ -147,6 +154,9 @@ func (s *stubQuerier) ListCFOrgs(_ context.Context) ([]db.CFOrg, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListCustomers(_ context.Context) ([]db.Customer, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) ListMeasurements(_ context.Context) ([]db.Measurement, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListResourceKind(_ context.Context) ([]db.ResourceKind, error) {

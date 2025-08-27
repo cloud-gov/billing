@@ -12,6 +12,7 @@ gen: db-up
 	@rm internal/db/* || true
 	@date
 	go generate ./...
+	@echo "Done."
 
 .PHONY: build
 build: gen
@@ -96,4 +97,3 @@ db-schema:
 test-db: db-down db-up db-migrate
 	@echo "Running database tests (TestDB*)..."
 	@set -a; source docker.env; set +a; go test ./... -run TestDB
-

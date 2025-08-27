@@ -1,8 +1,8 @@
 -- name: CreateReading :one
 INSERT INTO reading (
-	created_at
+	created_at, periodic
 ) VALUES (
-	$1
+	$1, $2
 )
 RETURNING *;
 

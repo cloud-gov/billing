@@ -1,6 +1,7 @@
 package dbx_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -50,11 +51,14 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		readingID2 = int32(2)
 		readingID3 = int32(3)
 		readingID4 = int32(4)
+		readingID5 = int32(5)
+		readingID6 = int32(6)
 		resourceID = "resource-1"
 		tz, _      = time.LoadLocation("America/New_York")
+		utc, _     = time.LoadLocation("")
 		priceLower = testutil.NewPgxTimestamptz(time.Date(2024, time.March, 1, 0, 0, 0, 0, tz))
 		priceUpper = testutil.NewPgxTimestamptz(time.Date(2026, time.March, 1, 0, 0, 0, 0, tz))
-		asOf       = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
+		asOf       = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 2, 0, 0, 0, 0, tz))
 	)
 
 	td := tdata{
@@ -86,36 +90,36 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		},
 		Readings: []db.Reading{
 			{
-				ID: readingID1,
-				CreatedAt: pgtype.Timestamp{
-					Time:  time.Date(2025, time.January, 1, 0, 0, 0, 0, tz),
-					Valid: true,
-				},
+				ID:        readingID1,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
+				// One month before bounds
 			},
 			{
-				ID: readingID2,
-				CreatedAt: pgtype.Timestamp{
-					Time:  time.Date(2025, time.February, 1, 0, 0, 0, 0, tz),
-					Valid: true,
-				},
+				ID:        readingID2,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+				// Correct first day of bounds, but before start of day ET
 			},
 			{
-				ID: readingID3,
-				CreatedAt: pgtype.Timestamp{
-					Time:  time.Date(2025, time.February, 3, 0, 0, 0, 0, tz),
-					Valid: true,
-				},
+				ID:        readingID3,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+				// Correct first day of bounds, and at start of day ET, inclusive
 			},
 			{
-				ID: readingID4,
-				CreatedAt: pgtype.Timestamp{
-					Time:  time.Date(2025, time.March, 1, 0, 0, 0, 0, tz),
-					Valid: true,
-				},
+				ID:        readingID4,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
+				// Correct month, mid-month
+			},
+			{
+				ID:        readingID5,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+				// Next month in UTC, still previous day in ET
+			},
+			{
+				ID:        readingID6,
+				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
+				// Next month in UTC and ET
 			},
 		},
-		// stuck. Either insert the things in a specific order or pre-determine the IDs.
-		// no problem with pre-determining the IDs, but need to write new sqlc functions
 		Resources: []db.Resource{
 			{
 				Meter:         meterName,
@@ -149,6 +153,18 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 				Value:             8,
 				ReadingID:         readingID4,
 			},
+			{
+				Meter:             meterName,
+				ResourceNaturalID: resourceID,
+				Value:             8,
+				ReadingID:         readingID5,
+			},
+			{
+				Meter:             meterName,
+				ResourceNaturalID: resourceID,
+				Value:             8,
+				ReadingID:         readingID6,
+			},
 		},
 	}
 
@@ -180,7 +196,11 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		}
 	}
 	for _, i := range td.Readings {
-		_, err := q.CreateReadingWithID(t.Context(), db.CreateReadingWithIDParams(i))
+		_, err := q.CreateReadingWithID(t.Context(), db.CreateReadingWithIDParams{
+			ID:        i.ID,
+			CreatedAt: i.CreatedAt,
+			Periodic:  i.Periodic,
+		})
 		if err != nil {
 			t.Fatal("creating reading failed", err)
 		}
@@ -207,7 +227,97 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	if err != nil {
 		t.Fatal("error occured while calling function under test", err)
 	}
-	if updated.Int64 != 2 {
+	if updated.Int64 != 3 {
 		t.Fatalf("expected %v rows updated, got %v", 2, updated.Int64)
+	}
+	ms, err := q.ListMeasurements(t.Context())
+	ms1 := ms[measurementFromReadingID(ms, readingID1)]
+	if ms1.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 1 AmountMicrocredits to be invalid, but was valid")
+		t.Fail()
+	}
+	ms2 := ms[measurementFromReadingID(ms, readingID2)]
+	if ms2.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 2 AmountMicrocredits to be invalid, but was valid")
+		t.Fail()
+	}
+	ms3 := ms[measurementFromReadingID(ms, readingID3)]
+	if !ms3.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 3 AmountMicrocredits to be valid, but was not")
+		t.Fail()
+	}
+	ms4 := ms[measurementFromReadingID(ms, readingID4)]
+	if !ms4.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 4 AmountMicrocredits to be valid, but was not")
+		t.Fail()
+	}
+	ms5 := ms[measurementFromReadingID(ms, readingID5)]
+	if !ms5.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 5 AmountMicrocredits to be valid, but was not")
+		t.Fail()
+	}
+	ms6 := ms[measurementFromReadingID(ms, readingID6)]
+	if ms6.AmountMicrocredits.Valid {
+		t.Logf("expected measurement 6 AmountMicrocredits to be invalid, but was valid")
+		t.Fail()
+	}
+}
+
+func measurementFromReadingID(m []db.Measurement, id int32) int {
+	return slices.IndexFunc(m, func(e db.Measurement) bool {
+		return e.ReadingID == id
+	})
+}
+
+func TestDBBoundsMonthPrev(t *testing.T) {
+	tz, _ := time.LoadLocation("America/New_York")
+
+	testCases := []struct {
+		Name                string
+		Tz                  *time.Location
+		AsOf                pgtype.Timestamptz
+		ExpectedPeriodStart pgtype.Timestamptz
+		ExpectedPeriodEnd   pgtype.Timestamptz
+	}{
+		{
+			Name:                "AsOf on exclusive upper bound",
+			Tz:                  tz,
+			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+		},
+		{
+			Name:                "AsOf mid-month",
+			Tz:                  tz,
+			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 15, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// Arrange
+			conn, err := pgxpool.New(t.Context(), "")
+			if err != nil {
+				t.Fatal("creating database connection failed", err)
+			}
+			// Test acquiring a connection from the pool.
+			if err = conn.Ping(t.Context()); err != nil {
+				t.Fatal("database connection ping failed")
+			}
+			q := dbx.NewQuerier(db.New(conn))
+
+			// Act
+			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
+
+			// Assert
+			if !result.PeriodStart.Time.Equal(tc.ExpectedPeriodStart.Time) {
+				t.Fatalf("expected period start %v, got %v", tc.ExpectedPeriodStart.Time, result.PeriodStart.Time)
+			}
+			if !result.PeriodEnd.Time.Equal(tc.ExpectedPeriodEnd.Time) {
+				t.Fatalf("expected period end %v, got %v", tc.ExpectedPeriodEnd.Time, result.PeriodEnd.Time)
+			}
+		})
 	}
 }

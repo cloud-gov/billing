@@ -13,17 +13,27 @@ import (
 
 const createReading = `-- name: CreateReading :one
 INSERT INTO reading (
-	created_at
+	created_at, periodic
 ) VALUES (
-	$1
+	$1, $2
 )
-RETURNING id, created_at, periodic
+RETURNING id, created_at, periodic, created_at_utc
 `
 
-func (q *Queries) CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error) {
-	row := q.db.QueryRow(ctx, createReading, createdAt)
+type CreateReadingParams struct {
+	CreatedAt pgtype.Timestamp
+	Periodic  bool
+}
+
+func (q *Queries) CreateReading(ctx context.Context, arg CreateReadingParams) (Reading, error) {
+	row := q.db.QueryRow(ctx, createReading, arg.CreatedAt, arg.Periodic)
 	var i Reading
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.Periodic,
+		&i.CreatedAtUTC,
+	)
 	return i, err
 }
 
@@ -33,7 +43,7 @@ INSERT INTO reading (
 ) VALUES (
 	$1, $2, $3
 )
-RETURNING id, created_at, periodic
+RETURNING id, created_at, periodic, created_at_utc
 `
 
 type CreateReadingWithIDParams struct {
@@ -45,7 +55,12 @@ type CreateReadingWithIDParams struct {
 func (q *Queries) CreateReadingWithID(ctx context.Context, arg CreateReadingWithIDParams) (Reading, error) {
 	row := q.db.QueryRow(ctx, createReadingWithID, arg.ID, arg.CreatedAt, arg.Periodic)
 	var i Reading
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.Periodic,
+		&i.CreatedAtUTC,
+	)
 	return i, err
 }
 
@@ -57,7 +72,7 @@ INSERT INTO reading (
 )
 ON CONFLICT (date_trunc('hour', created_at))
 DO NOTHING
-RETURNING id, created_at, periodic
+RETURNING id, created_at, periodic, created_at_utc
 `
 
 type CreateUniqueReadingParams struct {
@@ -69,6 +84,11 @@ type CreateUniqueReadingParams struct {
 func (q *Queries) CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error) {
 	row := q.db.QueryRow(ctx, createUniqueReading, arg.CreatedAt, arg.Periodic)
 	var i Reading
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.Periodic)
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.Periodic,
+		&i.CreatedAtUTC,
+	)
 	return i, err
 }

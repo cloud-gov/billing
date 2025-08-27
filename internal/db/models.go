@@ -116,10 +116,13 @@ type Price struct {
 }
 
 type Reading struct {
-	ID        int32
+	ID int32
+	// CreatedAt must be a time in UTC.
 	CreatedAt pgtype.Timestamp
 	// Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.
 	Periodic bool
+	// CreatedAtUTC supplements CreatedAt, which does not have a timezone. Values must be inserted into CreatedAt in UTC by the client. CreatedAt has a unique index on it to enforce readings being taken at most hourly. Because the index uses functions that are not volatility level IMMUTABLE, it cannot be used on a column with a timezone; hence the supplementary generated column.
+	CreatedAtUTC pgtype.Timestamptz
 }
 
 type Resource struct {
