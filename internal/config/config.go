@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 )
 
@@ -9,6 +10,9 @@ type Config struct {
 	ApiUrl         string
 	CFClientId     string
 	CFClientSecret string
+	Host           string
+	Port           string
+	LogLevel       slog.Level
 }
 
 func New() (Config, error) {
@@ -25,6 +29,16 @@ func New() (Config, error) {
 	if c.CFClientSecret == "" {
 		return Config{}, errors.New("reading CF_CLIENT_SECRET")
 	}
+	c.Port = os.Getenv("PORT")
+	if c.Port == "" {
+		c.Port = "8080"
+	}
+	c.Host = os.Getenv("HOST")
 
+	levelString := os.Getenv("LOG_LEVEL")
+	err := c.LogLevel.UnmarshalText([]byte(levelString))
+	if err != nil {
+		c.LogLevel = slog.LevelInfo
+	}
 	return c, nil
 }
