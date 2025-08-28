@@ -96,4 +96,5 @@ db-schema:
 .PHONY: test-db
 test-db: db-down db-up db-migrate
 	@echo "Running database tests (TestDB*)..."
-	@set -a; source docker.env; set +a; go test ./... -run TestDB
+	@# Disable caching with -count=1, since go does not cache bust when .sql files change
+	@set -a; source docker.env; set +a; go test ./... -run TestDB -count=1

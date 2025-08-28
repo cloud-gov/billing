@@ -110,8 +110,9 @@ type Price struct {
 	ID                  int32
 	Meter               string
 	KindNaturalID       string
-	UnitOfMeasure       pgtype.Text
-	MicrocreditsPerUnit pgtype.Int8
+	UnitOfMeasure       string
+	MicrocreditsPerUnit int64
+	Unit                int64
 	ValidDuring         pgtype.Range[pgtype.Timestamptz]
 }
 

@@ -86,7 +86,9 @@ main.go       # Entrypoint for the server program.
 
 ## Design Notes
 
-- Usage data is always persisted to the database, even if partial. The schema is informed by this need. For example, when we take a measurement for a `resource` but do not have a corresponding `resource_kind` in the database, we create an empty `resource_kind` record and will later ask the billing team to fill in the details. Our goal is to never lose usage data.
+### Collecting data
+
+Usage data is always persisted to the database, even if partial. The schema is informed by this need. For example, when we take a measurement for a `resource` but do not have a corresponding `resource_kind` in the database, we create an empty `resource_kind` record and will later ask the billing team to fill in the details. Our goal is to never lose usage data.
 
 ### Time
 
@@ -97,6 +99,7 @@ For all other operations, use UTC. For instance, when a usage reading is taken, 
 ## Known Limitations
 
 - Currently, credit usage corresponding to each measurement is calculated by multiplying the measurement's value by the applicable price's microcredits_per_unit and dividing by 730, a normalized hours-per-month. This assumes a reading (a collection of measurements) is taken every hour. If a reading fails to be taken due to the application being offline or any other reason, usage is not extrapolated for the gap. For example, suppose readings 1, 2, and 3 were meant to be taken at 1am, 2am, and 3am, covering 3 hours total (midnight to 3am). If reading 2 is skipped, usage will only be calculated for 2 of the three hours, because the current usage posting job does not extrapolate usage for the gap.
+- Prices should be denominated in a unit at least as small as the smallest time we measure so you never have to divide and round. For instance, if we bill per hour, resources should be priced hourly. As of writing, many prices are monthly (for example, 1 credit / month) but we measure usage hourly, meaning we must divide by 730 and round the result.
 
 ## References
 

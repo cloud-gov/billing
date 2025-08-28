@@ -12,17 +12,18 @@ import (
 )
 
 const createPriceWithID = `-- name: CreatePriceWithID :one
-INSERT INTO price (id, meter, kind_natural_id, unit_of_measure, microcredits_per_unit, valid_during)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, meter, kind_natural_id, unit_of_measure, microcredits_per_unit, valid_during
+INSERT INTO price (id, meter, kind_natural_id, unit_of_measure, microcredits_per_unit, unit, valid_during)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, meter, kind_natural_id, unit_of_measure, microcredits_per_unit, unit, valid_during
 `
 
 type CreatePriceWithIDParams struct {
 	ID                  int32
 	Meter               string
 	KindNaturalID       string
-	UnitOfMeasure       pgtype.Text
-	MicrocreditsPerUnit pgtype.Int8
+	UnitOfMeasure       string
+	MicrocreditsPerUnit int64
+	Unit                int64
 	ValidDuring         pgtype.Range[pgtype.Timestamptz]
 }
 
@@ -33,6 +34,7 @@ func (q *Queries) CreatePriceWithID(ctx context.Context, arg CreatePriceWithIDPa
 		arg.KindNaturalID,
 		arg.UnitOfMeasure,
 		arg.MicrocreditsPerUnit,
+		arg.Unit,
 		arg.ValidDuring,
 	)
 	var i Price
@@ -42,6 +44,7 @@ func (q *Queries) CreatePriceWithID(ctx context.Context, arg CreatePriceWithIDPa
 		&i.KindNaturalID,
 		&i.UnitOfMeasure,
 		&i.MicrocreditsPerUnit,
+		&i.Unit,
 		&i.ValidDuring,
 	)
 	return i, err

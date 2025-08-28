@@ -29,9 +29,11 @@ CREATE TABLE price (
 	meter text NOT NULL,
 	kind_natural_id text NOT NULL,
 
-	unit_of_measure text,
-	microcredits_per_unit bigint,
-	valid_during tstzrange,
+	unit_of_measure text NOT NULL,
+	microcredits_per_unit bigint NOT NULL,
+    unit bigint NOT NULL,
+
+	valid_during tstzrange NOT NULL,
 
 	CONSTRAINT fk_resource_kind FOREIGN KEY (meter, kind_natural_id) REFERENCES resource_kind(meter, natural_id)
 );
@@ -86,7 +88,7 @@ BEGIN
 			r.meter AS meter,
 			r.natural_id AS resource_natural_id,
 			rd.id AS reading_id,
-			sum(p.microcredits_per_unit * m.value) AS amount_microcredits,
+			sum(p.microcredits_per_unit * m.value / p.unit) AS amount_microcredits,
 			p.id AS price_id
 		FROM reading rd
 		JOIN measurement AS m
@@ -95,8 +97,8 @@ BEGIN
 		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
 		JOIN price AS p
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
-		WHERE ps <= (rd.created_at at time zone 'utc')
-		AND (rd.created_at at time zone 'utc') < pe
+		WHERE ps <= rd.created_at
+		AND rd.created_at < pe
 		AND m.amount_microcredits IS NULL
 		GROUP BY
 			r.meter,

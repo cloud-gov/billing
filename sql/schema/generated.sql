@@ -87,10 +87,15 @@ DECLARE
 	pe timestamptz;
 	updated bigint;
 BEGIN
-	SELECT period_start, period_end into ps, pe from bounds_month_prev(as_of);
+	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
 
 	WITH measurement_amounts AS (
-		SELECT r.meter AS meter, r.natural_id AS resource_natural_id, rd.id AS reading_id, sum(p.microcredits_per_unit * m.value) AS amount_microcredits, p.id AS price_id
+		SELECT
+			r.meter AS meter,
+			r.natural_id AS resource_natural_id,
+			rd.id AS reading_id,
+			sum(p.microcredits_per_unit * m.value / p.unit) AS amount_microcredits,
+			p.id AS price_id
 		FROM reading rd
 		JOIN measurement AS m
 		ON rd.id = m.reading_id
@@ -100,7 +105,12 @@ BEGIN
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
 		WHERE ps <= rd.created_at
 		AND rd.created_at < pe
-		GROUP BY r.meter, r.natural_id, rd.id, p.id
+		AND m.amount_microcredits IS NULL
+		GROUP BY
+			r.meter,
+			r.natural_id,
+			rd.id,
+			p.id
 	),
 	update_measurements AS (
 		UPDATE measurement AS m
@@ -197,9 +207,10 @@ CREATE TABLE public.price (
     id integer NOT NULL,
     meter text NOT NULL,
     kind_natural_id text NOT NULL,
-    unit_of_measure text,
-    microcredits_per_unit bigint,
-    valid_during tstzrange
+    unit_of_measure text NOT NULL,
+    microcredits_per_unit bigint NOT NULL,
+    unit bigint NOT NULL,
+    valid_during tstzrange NOT NULL
 );
 
 CREATE SEQUENCE public.price_id_seq
@@ -219,9 +230,11 @@ CREATE TABLE public.reading (
     created_at_utc timestamp with time zone GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC'::text)) STORED
 );
 
+COMMENT ON COLUMN public.reading.created_at IS 'CreatedAt must be a time in UTC.';
+
 COMMENT ON COLUMN public.reading.periodic IS 'Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.';
 
-COMMENT ON COLUMN public.reading.created_at_utc IS 'CreatedAtUTC supplements ';
+COMMENT ON COLUMN public.reading.created_at_utc IS 'CreatedAtUTC supplements CreatedAt, which does not have a timezone. Values must be inserted into CreatedAt in UTC by the client. CreatedAt has a unique index on it to enforce readings being taken at most hourly. Because the index uses functions that are not volatility level IMMUTABLE, it cannot be used on a column with a timezone; hence the supplementary generated column.';
 
 CREATE SEQUENCE public.reading_id_seq
     AS integer

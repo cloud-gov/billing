@@ -81,10 +81,15 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 				Meter:               meterName,
 				ID:                  priceID,
 				KindNaturalID:       kindID,
-				MicrocreditsPerUnit: pgtype.Int8{Int64: 8, Valid: true},
+				MicrocreditsPerUnit: 8,
+				UnitOfMeasure:       "hours",
+				Unit:                2, // Just for checking the math.
 				ValidDuring: pgtype.Range[pgtype.Timestamptz]{
-					Lower: priceLower,
-					Upper: priceUpper,
+					Lower:     priceLower,
+					Upper:     priceUpper,
+					LowerType: pgtype.Inclusive,
+					UpperType: pgtype.Exclusive,
+					Valid:     true,
 				},
 			},
 		},
@@ -132,37 +137,37 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID1,
 			},
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID2,
 			},
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID3,
 			},
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID4,
 			},
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID5,
 			},
 			{
 				Meter:             meterName,
 				ResourceNaturalID: resourceID,
-				Value:             8,
+				Value:             7,
 				ReadingID:         readingID6,
 			},
 		},
@@ -246,15 +251,25 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		t.Logf("expected measurement 3 AmountMicrocredits to be valid, but was not")
 		t.Fail()
 	}
+	var expectedAmount int64 = 7 * 8 / 2
+	if ms3.AmountMicrocredits.Int64 != expectedAmount {
+		t.Logf("expected measurement 3 AmountMicrocredits to be %v, got %v", expectedAmount, ms3.AmountMicrocredits.Int64)
+	}
 	ms4 := ms[measurementFromReadingID(ms, readingID4)]
 	if !ms4.AmountMicrocredits.Valid {
 		t.Logf("expected measurement 4 AmountMicrocredits to be valid, but was not")
 		t.Fail()
 	}
+	if ms4.AmountMicrocredits.Int64 != expectedAmount {
+		t.Logf("expected measurement 4 AmountMicrocredits to be %v, got %v", expectedAmount, ms4.AmountMicrocredits.Int64)
+	}
 	ms5 := ms[measurementFromReadingID(ms, readingID5)]
 	if !ms5.AmountMicrocredits.Valid {
 		t.Logf("expected measurement 5 AmountMicrocredits to be valid, but was not")
 		t.Fail()
+	}
+	if ms5.AmountMicrocredits.Int64 != expectedAmount {
+		t.Logf("expected measurement 5 AmountMicrocredits to be %v, got %v", expectedAmount, ms5.AmountMicrocredits.Int64)
 	}
 	ms6 := ms[measurementFromReadingID(ms, readingID6)]
 	if ms6.AmountMicrocredits.Valid {
