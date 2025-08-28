@@ -4,3 +4,8 @@ INSERT INTO meter (name)
 SELECT DISTINCT name
 FROM UNNEST(sqlc.arg(names)::text[]) AS name
 ON CONFLICT DO NOTHING;
+
+-- name: CreateMeter :one
+INSERT INTO meter (name)
+VALUES ($1)
+RETURNING *;

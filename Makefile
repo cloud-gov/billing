@@ -12,6 +12,7 @@ gen: db-up
 	@rm internal/db/* || true
 	@date
 	go generate ./...
+	@echo "Done."
 
 .PHONY: build
 build: gen
@@ -19,7 +20,7 @@ build: gen
 
 .PHONY: test
 test: gen
-	go test ./...
+	go test ./... -skip TestDB
 
 .PHONY: debug
 debug: gen
@@ -71,6 +72,11 @@ db-migrate: db-init
 	@# Migrate River schema to latest.
 	@set -a; source docker.env; set +a; go tool river migrate-up
 
+.PHONY: db-remigrate
+db-remigrate: db-init
+	@# Redo the latest migration in Tern.
+	@set -a; source docker.env; set +a; go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
+
 .PHONY: db-reset
 db-reset: db-drop db-init db-migrate
 	@echo "Database reset. Restart app to reconnect."
@@ -86,3 +92,9 @@ db-schema:
 	| grep --invert-match "\-\-" \
 	| cat -s \
 	> sql/schema/generated.sql
+
+.PHONY: test-db
+test-db: db-down db-up db-migrate
+	@echo "Running database tests (TestDB*)..."
+	@# Disable caching with -count=1, since go does not cache bust when .sql files change
+	@set -a; source docker.env; set +a; go test ./... -run TestDB -count=1

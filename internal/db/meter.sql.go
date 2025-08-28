@@ -21,3 +21,15 @@ func (q *Queries) BulkCreateMeters(ctx context.Context, names []string) error {
 	_, err := q.db.Exec(ctx, bulkCreateMeters, names)
 	return err
 }
+
+const createMeter = `-- name: CreateMeter :one
+INSERT INTO meter (name)
+VALUES ($1)
+RETURNING name
+`
+
+func (q *Queries) CreateMeter(ctx context.Context, name string) (string, error) {
+	row := q.db.QueryRow(ctx, createMeter, name)
+	err := row.Scan(&name)
+	return name, err
+}

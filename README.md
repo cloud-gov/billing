@@ -20,6 +20,15 @@ make watch # Watch .go files for changes. On change, recompile and restart the s
 make clean # Shut down the database if it is running and clean binary artifacts.
 ```
 
+To run the tests:
+
+```sh
+make test # Run unit tests
+make test-db # Run database tests. See warning below.
+```
+
+**Warning**: `make test-db` will run `db-down`, shutting down the postgres container if it is running. This will erase all data in the database.
+
 ### Cloud Foundry
 
 As of writing, the application uses the local user's Cloud Foundry session to authenticate. You must sign into Cloud Foundry with `cf login` before starting the application.
@@ -50,6 +59,12 @@ Tips:
   - River job args are serialized to JSON, stored in the database, and deserialized to be run; dependencies like API clients and loggers may not fully serialize their internal state, resulting in nil pointer panics when they are unmarshalled and used.
   - Additionally, dependencies may have sensitive internal information that should not be persisted to the database.
 
+### Testing
+
+Tests follow these naming conventions:
+
+- `TestDB*`: Database tests. Run with `make test-db`, which starts a fresh postgres Docker instance and migrates it to the latest migration.
+
 ## Packages
 
 The program has the following structure:
@@ -69,9 +84,22 @@ gen.go        # Program-scope go:generate directives.
 main.go       # Entrypoint for the server program.
 ```
 
-### Notes
+## Design Notes
 
-- Usage data is always persisted to the database, even if partial. The schema is informed by this need. For example, when we take a measurement for a `resource` but do not have a corresponding `resource_kind` in the database, we create an empty `resource_kind` record and will later ask the billing team to fill in the details. Our goal is to never lose usage data.
+### Collecting data
+
+Usage data is always persisted to the database, even if partial. The schema is informed by this need. For example, when we take a measurement for a `resource` but do not have a corresponding `resource_kind` in the database, we create an empty `resource_kind` record and will later ask the billing team to fill in the details. Our goal is to never lose usage data.
+
+### Time
+
+For business operations like posting usage to customer accounts, use the timezone for `America/New_York`. This aligns with other Cloud.gov business processes; for example, Cloud.gov agreements are considered to execute in Eastern Time.
+
+For all other operations, use UTC. For instance, when a usage reading is taken, the timestamp is captured in UTC.
+
+## Known Limitations
+
+- Currently, credit usage corresponding to each measurement is calculated by multiplying the measurement's value by the applicable price's microcredits_per_unit and dividing by 730, a normalized hours-per-month. This assumes a reading (a collection of measurements) is taken every hour. If a reading fails to be taken due to the application being offline or any other reason, usage is not extrapolated for the gap. For example, suppose readings 1, 2, and 3 were meant to be taken at 1am, 2am, and 3am, covering 3 hours total (midnight to 3am). If reading 2 is skipped, usage will only be calculated for 2 of the three hours, because the current usage posting job does not extrapolate usage for the gap.
+- Prices should be denominated in a unit at least as small as the smallest time we measure so you never have to divide and round. For instance, if we bill per hour, resources should be priced hourly. As of writing, many prices are monthly (for example, 1 credit / month) but we measure usage hourly, meaning we must divide by 730 and round the result.
 
 ## References
 

@@ -83,10 +83,10 @@ type Customer struct {
 }
 
 type Entry struct {
-	TransactionID int32
-	AccountID     int32
-	Amount        pgtype.Numeric
-	Direction     pgtype.Int4
+	TransactionID      int32
+	AccountID          int32
+	Direction          pgtype.Int4
+	AmountMicrocredits pgtype.Int8
 }
 
 type Measurement struct {
@@ -94,6 +94,11 @@ type Measurement struct {
 	Meter             string
 	ResourceNaturalID string
 	Value             int32
+	// AmountMicrocredits is a denormalized column that is calculated from the Price of the ResourceKind that was applicable when the measurement was taken (based on the time of the Reading). The value is persisted here for simpler rollups and auditing.
+	AmountMicrocredits pgtype.Int8
+	// TransactionID is the transaction that accounts for this usage, typically a "post usage" transaction.
+	TransactionID pgtype.Int8
+	PriceID       pgtype.Int8
 }
 
 // A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.
@@ -101,11 +106,24 @@ type Meter struct {
 	Name string
 }
 
+type Price struct {
+	ID                  int32
+	Meter               string
+	KindNaturalID       string
+	UnitOfMeasure       string
+	MicrocreditsPerUnit int64
+	Unit                int64
+	ValidDuring         pgtype.Range[pgtype.Timestamptz]
+}
+
 type Reading struct {
-	ID        int32
+	ID int32
+	// CreatedAt must be a time in UTC.
 	CreatedAt pgtype.Timestamp
 	// Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.
 	Periodic bool
+	// CreatedAtUTC supplements CreatedAt, which does not have a timezone. Values must be inserted into CreatedAt in UTC by the client. CreatedAt has a unique index on it to enforce readings being taken at most hourly. Because the index uses functions that are not volatility level IMMUTABLE, it cannot be used on a column with a timezone; hence the supplementary generated column.
+	CreatedAtUTC pgtype.Timestamptz
 }
 
 type Resource struct {
@@ -117,11 +135,9 @@ type Resource struct {
 
 // ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.
 type ResourceKind struct {
-	Meter         string
-	NaturalID     string
-	Credits       pgtype.Int4
-	Amount        pgtype.Int4
-	UnitOfMeasure pgtype.Text
+	Meter     string
+	NaturalID string
+	Name      pgtype.Text
 }
 
 type Tier struct {

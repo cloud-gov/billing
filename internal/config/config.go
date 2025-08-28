@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -11,6 +12,8 @@ type Config struct {
 	CFClientId     string
 	CFClientSecret string
 	Issuer         string
+	// DebugDisableAuth must only be used for local development. Setting to true allows unauthenticated requests to all endpoints.
+	DebugDisableAuth bool
 }
 
 func New() (Config, error) {
@@ -31,5 +34,6 @@ func New() (Config, error) {
 	if c.Issuer == "" {
 		return Config{}, errors.New("reading OIDC_ISSUER")
 	}
+	c.DebugDisableAuth, _ = strconv.ParseBool(os.Getenv("DEBUG_DISABLE_AUTH")) // ignore malformed values
 	return c, nil
 }

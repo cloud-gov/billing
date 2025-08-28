@@ -16,6 +16,8 @@ type Querier interface {
 	//   liabilities
 	//   expenses
 	AccountingEquation(ctx context.Context) ([]string, error)
+	// BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
+	BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) (BoundsMonthPrevRow, error)
 	// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 	BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error
@@ -27,10 +29,15 @@ type Querier interface {
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
+	CreateCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
 	CreateCustomer(ctx context.Context, name string) (int64, error)
+	CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error)
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
-	CreateReading(ctx context.Context, createdAt pgtype.Timestamp) (Reading, error)
+	CreateMeter(ctx context.Context, name string) (string, error)
+	CreatePriceWithID(ctx context.Context, arg CreatePriceWithIDParams) (Price, error)
+	CreateReading(ctx context.Context, arg CreateReadingParams) (Reading, error)
+	CreateReadingWithID(ctx context.Context, arg CreateReadingWithIDParams) (Reading, error)
 	CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error)
 	CreateResources(ctx context.Context, arg CreateResourcesParams) error
 	CreateTier(ctx context.Context, arg CreateTierParams) (Tier, error)
@@ -49,6 +56,7 @@ type Querier interface {
 	GetTransaction(ctx context.Context, id int32) ([]Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListMeasurements(ctx context.Context) ([]Measurement, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
@@ -58,8 +66,9 @@ type Querier interface {
 	SumEntries(ctx context.Context) ([]pgtype.Numeric, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
+	// UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
+	UpdateMeasurementMicrocredits(ctx context.Context, asOf pgtype.Timestamptz) (pgtype.Int8, error)
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
-	UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error
 	UpdateTier(ctx context.Context, arg UpdateTierParams) error
 	// UpsertResource upserts a Resource and creates minimal rows in foreign tables -- namely meter, cf_org, and resource_kind -- to which Resource has foreign keys. Efficient for single inserts. For bulk inserts, review Bulk* functions.
 	UpsertResource(ctx context.Context, arg UpsertResourceParams) (Resource, error)
