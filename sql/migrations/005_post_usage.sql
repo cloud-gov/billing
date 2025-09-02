@@ -59,9 +59,8 @@ RETURNS table (
 	period_start timestamptz,
 	period_end timestamptz
 )
-	LANGUAGE sql IMMUTABLE
-	AS $$
-
+LANGUAGE sql IMMUTABLE
+AS $$
 	WITH bounds_base AS (
 		SELECT date_trunc('month', as_of at time zone tz) AS this_month_local
 	)
@@ -97,8 +96,8 @@ BEGIN
 		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
 		JOIN price AS p
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
-		WHERE ps <= rd.created_at
-		AND rd.created_at < pe
+		WHERE ps <= rd.created_at_utc
+		AND rd.created_at_utc < pe
 		AND m.amount_microcredits IS NULL
 		GROUP BY
 			r.meter,
