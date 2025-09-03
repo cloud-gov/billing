@@ -87,7 +87,7 @@ func (s *stubQuerier) BulkCreateMeasurement(_ context.Context, arg db.BulkCreate
 func (s *stubQuerier) AccountingEquation(_ context.Context) ([]string, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CreateCFOrg(_ context.Context, arg pgtype.UUID) (db.CFOrg, error) {
+func (s *stubQuerier) CreateCFOrg(_ context.Context, arg db.CreateCFOrgParams) (db.CFOrg, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) CreateCustomer(_ context.Context, arg string) (int64, error) {
@@ -172,6 +172,9 @@ func (s *stubQuerier) ListTransactions(_ context.Context) ([]db.Transaction, err
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListTransactionsWide(_ context.Context) ([]db.ListTransactionsWideRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) PostUsage(_ context.Context, asOf pgtype.Timestamptz) ([]db.PostUsageRow, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) SumEntries(_ context.Context) ([]pgtype.Numeric, error) {

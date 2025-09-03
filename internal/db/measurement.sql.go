@@ -66,17 +66,19 @@ INSERT INTO measurement (
 	reading_id,
 	meter,
 	resource_natural_id,
-	value
+	value,
+	amount_microcredits
 ) VALUES (
-	$1, $2, $3, $4
+	$1, $2, $3, $4, $5
 ) RETURNING reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
 `
 
 type CreateMeasurementParams struct {
-	ReadingID         int32
-	Meter             string
-	ResourceNaturalID string
-	Value             int32
+	ReadingID          int32
+	Meter              string
+	ResourceNaturalID  string
+	Value              int32
+	AmountMicrocredits pgtype.Int8
 }
 
 func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error) {
@@ -85,6 +87,7 @@ func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementPa
 		arg.Meter,
 		arg.ResourceNaturalID,
 		arg.Value,
+		arg.AmountMicrocredits,
 	)
 	var i Measurement
 	err := row.Scan(
@@ -129,6 +132,36 @@ func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
 			&i.TransactionID,
 			&i.PriceID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const postUsage = `-- name: PostUsage :many
+SELECT customer_id, total_amount_microcredits
+FROM post_usage($1)
+`
+
+type PostUsageRow struct {
+	CustomerID              pgtype.Int8
+	TotalAmountMicrocredits pgtype.Int8
+}
+
+func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]PostUsageRow, error) {
+	rows, err := q.db.Query(ctx, postUsage, asOf)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PostUsageRow
+	for rows.Next() {
+		var i PostUsageRow
+		if err := rows.Scan(&i.CustomerID, &i.TotalAmountMicrocredits); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

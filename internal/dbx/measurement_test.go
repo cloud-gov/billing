@@ -12,35 +12,98 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func mkResourceKind(meter, naturalID string) db.ResourceKind {
-	return db.ResourceKind{
-		Meter:     meter,
-		NaturalID: naturalID,
-		Name:      pgtype.Text{String: "", Valid: true},
+// testData is used to populate the database with rows required to perform a test.
+type testData struct {
+	Customers    []db.Customer
+	Kinds        []db.ResourceKind
+	Measurements []db.Measurement
+	Meters       []db.Meter
+	Orgs         []db.CFOrg
+	Prices       []db.Price
+	Readings     []db.Reading
+	Resources    []db.Resource
+}
+
+func TestDBBoundsMonthPrev(t *testing.T) {
+	tz, _ := time.LoadLocation("America/New_York")
+
+	testCases := []struct {
+		Name                string
+		Tz                  *time.Location
+		AsOf                pgtype.Timestamptz
+		ExpectedPeriodStart pgtype.Timestamptz
+		ExpectedPeriodEnd   pgtype.Timestamptz
+	}{
+		{
+			Name:                "AsOf on exclusive upper bound",
+			Tz:                  tz,
+			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+		},
+		{
+			Name:                "AsOf mid-month",
+			Tz:                  tz,
+			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 15, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// Arrange
+			conn, err := pgxpool.New(t.Context(), "")
+			if err != nil {
+				t.Fatal("creating database connection failed", err)
+			}
+			q := newTx(t, conn, false)
+
+			// Act
+			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
+
+			// Assert
+			if err != nil {
+				t.Fatal("error calling the function under test", err)
+			}
+			
+			if !result.PeriodStart.Time.Equal(tc.ExpectedPeriodStart.Time) {
+				t.Fatalf("expected period start %v, got %v", tc.ExpectedPeriodStart.Time, result.PeriodStart.Time)
+			}
+			if !result.PeriodEnd.Time.Equal(tc.ExpectedPeriodEnd.Time) {
+				t.Fatalf("expected period end %v, got %v", tc.ExpectedPeriodEnd.Time, result.PeriodEnd.Time)
+			}
+		})
 	}
 }
 
-func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
-	type tdata struct {
-		Orgs         []db.CFOrg
-		Meters       []db.Meter
-		Kinds        []db.ResourceKind
-		Prices       []db.Price
-		Readings     []db.Reading
-		Resources    []db.Resource
-		Measurements []db.Measurement
+// newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so they receive and can roll back separate transactions. By default, the transaction is rolled back when the test completes so tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- set commit to true.
+func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
+	tx, err := conn.Begin(t.Context())
+	if err != nil {
+		t.Fatal("begin transaction failed", err)
 	}
 
+	if commit {
+		t.Cleanup(func() { tx.Commit(t.Context()) })
+	} else {
+		t.Cleanup(func() { tx.Rollback(t.Context()) })
+	}
+
+	// Test acquiring a connection from the pool.
+	if err = conn.Ping(t.Context()); err != nil {
+		t.Fatal("database connection ping failed")
+	}
+	return dbx.NewQuerier(db.New(conn)).WithTx(tx)
+}
+
+func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	// Arrange
 	conn, err := pgxpool.New(t.Context(), "")
 	if err != nil {
 		t.Fatal("creating database connection failed", err)
 	}
-	// Test acquiring a connection from the pool.
-	if err = conn.Ping(t.Context()); err != nil {
-		t.Fatal("database connection ping failed")
-	}
-	q := dbx.NewQuerier(db.New(conn))
+	q := newTx(t, conn, false)
 
 	var (
 		orgID      = testutil.NewPgxUUID()
@@ -61,7 +124,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		asOf       = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 2, 0, 0, 0, 0, tz))
 	)
 
-	td := tdata{
+	td := testData{
 		Orgs: []db.CFOrg{
 			{
 				ID: orgID,
@@ -74,7 +137,11 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		},
 
 		Kinds: []db.ResourceKind{
-			mkResourceKind(meterName, kindID),
+			{
+				Meter:     meterName,
+				NaturalID: kindID,
+				Name:      pgtype.Text{String: "", Valid: true},
+			},
 		},
 		Prices: []db.Price{
 			{
@@ -173,57 +240,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		},
 	}
 
-	for _, i := range td.Orgs {
-		_, err := q.CreateCFOrg(t.Context(), i.ID)
-		if err != nil {
-			t.Fatal("creating CF org failed", err)
-		}
-	}
-	for _, i := range td.Meters {
-		_, err := q.CreateMeter(t.Context(), i.Name)
-		if err != nil {
-			t.Fatal("creating meter failed", err)
-		}
-	}
-	for _, i := range td.Kinds {
-		_, err := q.CreateResourceKind(t.Context(), db.CreateResourceKindParams{
-			Meter:     i.Meter,
-			NaturalID: i.NaturalID,
-		})
-		if err != nil {
-			t.Fatal("creating resource kind failed", err)
-		}
-	}
-	for _, i := range td.Prices {
-		_, err := q.CreatePriceWithID(t.Context(), db.CreatePriceWithIDParams(i))
-		if err != nil {
-			t.Fatal("creating price failed", err)
-		}
-	}
-	for _, i := range td.Readings {
-		_, err := q.CreateReadingWithID(t.Context(), db.CreateReadingWithIDParams{
-			ID:        i.ID,
-			CreatedAt: i.CreatedAt,
-			Periodic:  i.Periodic,
-		})
-		if err != nil {
-			t.Fatal("creating reading failed", err)
-		}
-	}
-	for _, i := range td.Resources {
-		err = q.CreateResources(t.Context(), db.CreateResourcesParams(i))
-		if err != nil {
-			t.Fatal("creating resource failed", err)
-		}
-	}
-	for _, i := range td.Measurements {
-		q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
-			ReadingID:         i.ReadingID,
-			Meter:             i.Meter,
-			ResourceNaturalID: i.ResourceNaturalID,
-			Value:             i.Value,
-		})
-	}
+	createTestData(t, q, td)
 
 	// Act
 	updated, err := q.UpdateMeasurementMicrocredits(t.Context(), asOf)
@@ -288,29 +305,144 @@ func measurementFromReadingID(m []db.Measurement, id int32) int {
 	})
 }
 
-func TestDBBoundsMonthPrev(t *testing.T) {
-	tz, _ := time.LoadLocation("America/New_York")
+func TestDBPostUsage(t *testing.T) {
+	_, _ = time.LoadLocation("America/New_York")
+
+	var (
+		customerID         = int64(1)
+		orgID              = testutil.NewPgxUUID()
+		meterName          = "meter-1"
+		kindID             = "kind-1"
+		readingID1         = int32(1)
+		readingID2         = int32(2)
+		readingID3         = int32(3)
+		readingID4         = int32(4)
+		readingID5         = int32(5)
+		readingID6         = int32(6)
+		resourceID         = "resource-1"
+		amountMicrocredits = pgtype.Int8{Int64: 56, Valid: true}
+		tz, _              = time.LoadLocation("America/New_York")
+		utc, _             = time.LoadLocation("")
+		asOf               = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
+	)
 
 	testCases := []struct {
-		Name                string
-		Tz                  *time.Location
-		AsOf                pgtype.Timestamptz
-		ExpectedPeriodStart pgtype.Timestamptz
-		ExpectedPeriodEnd   pgtype.Timestamptz
+		Name string
+		AsOf pgtype.Timestamptz
+		Data testData
 	}{
 		{
-			Name:                "AsOf on exclusive upper bound",
-			Tz:                  tz,
-			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
-		},
-		{
-			Name:                "AsOf mid-month",
-			Tz:                  tz,
-			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 15, 0, 0, 0, 0, tz)),
-			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			Name: "",
+			AsOf: asOf,
+			Data: testData{
+				Customers: []db.Customer{
+					{
+						ID: customerID,
+					},
+				},
+				Orgs: []db.CFOrg{
+					{
+						ID:         orgID,
+						CustomerID: pgtype.Int8{Int64: customerID, Valid: true},
+					},
+				},
+				Meters: []db.Meter{
+					{
+						Name: meterName,
+					},
+				},
+				Kinds: []db.ResourceKind{
+					{
+						Meter:     meterName,
+						NaturalID: kindID,
+						Name:      pgtype.Text{String: "", Valid: true},
+					},
+				},
+				Readings: []db.Reading{
+					{
+						ID:        readingID1,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
+						// One month before bounds
+					},
+					{
+						ID:        readingID2,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+						// Correct first day of bounds, but before start of day ET
+					},
+					{
+						ID:        readingID3,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+						// Correct first day of bounds, and at start of day ET, inclusive
+					},
+					{
+						ID:        readingID4,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
+						// Correct month, mid-month
+					},
+					{
+						ID:        readingID5,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+						// Next month in UTC, still previous day in ET
+					},
+					{
+						ID:        readingID6,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
+						// Next month in UTC and ET
+					},
+				},
+				Resources: []db.Resource{
+					{
+						Meter:         meterName,
+						NaturalID:     resourceID,
+						KindNaturalID: kindID,
+						CFOrgID:       orgID,
+					},
+				},
+				Measurements: []db.Measurement{
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID1,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID2,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID3,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID4,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID5,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resourceID,
+						Value:              7,
+						ReadingID:          readingID6,
+						AmountMicrocredits: amountMicrocredits,
+					},
+				},
+			},
 		},
 	}
 
@@ -321,26 +453,83 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			// Test acquiring a connection from the pool.
-			if err = conn.Ping(t.Context()); err != nil {
-				t.Fatal("database connection ping failed")
-			}
-			q := dbx.NewQuerier(db.New(conn))
+			q := newTx(t, conn, true)
+
+			createTestData(t, q, tc.Data)
 
 			// Act
-			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
+			results, err := q.PostUsage(t.Context(), tc.AsOf)
 
 			// Assert
-			if err != nil {
-				t.Fatal("error calling the function under test", err)
+			if len(results) != 1 {
+				t.Fatalf("expected 1 row returned, got %v", len(results))
 			}
+			if total := results[0].TotalAmountMicrocredits.Int64; total != 3*56 {
+				t.Fatalf("expected total %v, got %v", 3*56, total)
+			}
+		})
+	}
+}
 
-			if !result.PeriodStart.Time.Equal(tc.ExpectedPeriodStart.Time) {
-				t.Fatalf("expected period start %v, got %v", tc.ExpectedPeriodStart.Time, result.PeriodStart.Time)
-			}
-			if !result.PeriodEnd.Time.Equal(tc.ExpectedPeriodEnd.Time) {
-				t.Fatalf("expected period end %v, got %v", tc.ExpectedPeriodEnd.Time, result.PeriodEnd.Time)
-			}
+// createTestData creates a row for each struct in the provided data. It uses the Create methods from q, which may have additional effects.
+func createTestData(t *testing.T, q db.Querier, td testData) {
+	// Order of creation depends on fkey dependencies.
+	for _, i := range td.Customers {
+		_, err := q.CreateCustomer(t.Context(), i.Name)
+		if err != nil {
+			t.Fatal("creating customer failed", err)
+		}
+	}
+	for _, i := range td.Orgs {
+		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(i))
+		if err != nil {
+			t.Fatal("creating CF org failed", err)
+		}
+	}
+	for _, i := range td.Meters {
+		_, err := q.CreateMeter(t.Context(), i.Name)
+		if err != nil {
+			t.Fatal("creating meter failed", err)
+		}
+	}
+	for _, i := range td.Kinds {
+		_, err := q.CreateResourceKind(t.Context(), db.CreateResourceKindParams{
+			Meter:     i.Meter,
+			NaturalID: i.NaturalID,
+		})
+		if err != nil {
+			t.Fatal("creating resource kind failed", err)
+		}
+	}
+	for _, i := range td.Prices {
+		_, err := q.CreatePriceWithID(t.Context(), db.CreatePriceWithIDParams(i))
+		if err != nil {
+			t.Fatal("creating price failed", err)
+		}
+	}
+	for _, i := range td.Readings {
+		_, err := q.CreateReadingWithID(t.Context(), db.CreateReadingWithIDParams{
+			ID:        i.ID,
+			CreatedAt: i.CreatedAt,
+			Periodic:  i.Periodic,
+		})
+		if err != nil {
+			t.Fatal("creating reading failed", err)
+		}
+	}
+	for _, i := range td.Resources {
+		err := q.CreateResources(t.Context(), db.CreateResourcesParams(i))
+		if err != nil {
+			t.Fatal("creating resource failed", err)
+		}
+	}
+	for _, i := range td.Measurements {
+		q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
+			ReadingID:          i.ReadingID,
+			Meter:              i.Meter,
+			ResourceNaturalID:  i.ResourceNaturalID,
+			Value:              i.Value,
+			AmountMicrocredits: i.AmountMicrocredits,
 		})
 	}
 }
