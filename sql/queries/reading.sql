@@ -1,8 +1,8 @@
 -- name: CreateReading :one
 INSERT INTO reading (
-	created_at
+	created_at, periodic
 ) VALUES (
-	$1
+	$1, $2
 )
 RETURNING *;
 
@@ -15,4 +15,12 @@ INSERT INTO reading (
 )
 ON CONFLICT (date_trunc('hour', created_at))
 DO NOTHING
+RETURNING *;
+
+-- name: CreateReadingWithID :one
+INSERT INTO reading (
+	id, created_at, periodic
+) VALUES (
+	$1, $2, $3
+)
 RETURNING *;

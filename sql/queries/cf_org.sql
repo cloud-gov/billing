@@ -1,3 +1,8 @@
+-- name: CreateCFOrg :one
+INSERT INTO cf_org (id)
+VALUES ($1)
+RETURNING *;
+
 -- name: GetCFOrg :one
 SELECT * FROM cf_org
 WHERE id = $1 LIMIT 1;

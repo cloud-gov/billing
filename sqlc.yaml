@@ -15,6 +15,7 @@ sql:
         rename:
           cf_org: "CFOrg"
           cf_org_id: "CFOrgID"
+          created_at_utc: "CreatedAtUTC"
     database:
       managed: true
     rules:

@@ -99,7 +99,7 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 }
 
 const listTransactionsWide = `-- name: ListTransactionsWide :many
-SELECT transaction_id, account_id, amount, direction, account.id, customer_id, type, account_type.id, name, normal
+SELECT transaction_id, account_id, direction, amount_microcredits, account.id, customer_id, type, account_type.id, name, normal
 FROM
   entry
   LEFT JOIN account ON entry.account_id = account.id
@@ -107,16 +107,16 @@ FROM
 `
 
 type ListTransactionsWideRow struct {
-	TransactionID int32
-	AccountID     int32
-	Amount        pgtype.Numeric
-	Direction     pgtype.Int4
-	ID            pgtype.Int4
-	CustomerID    pgtype.Int8
-	Type          pgtype.Int4
-	ID_2          pgtype.Int4
-	Name          pgtype.Text
-	Normal        pgtype.Int4
+	TransactionID      int32
+	AccountID          int32
+	Direction          pgtype.Int4
+	AmountMicrocredits pgtype.Int8
+	ID                 pgtype.Int4
+	CustomerID         pgtype.Int8
+	Type               pgtype.Int4
+	ID_2               pgtype.Int4
+	Name               pgtype.Text
+	Normal             pgtype.Int4
 }
 
 func (q *Queries) ListTransactionsWide(ctx context.Context) ([]ListTransactionsWideRow, error) {
@@ -131,8 +131,8 @@ func (q *Queries) ListTransactionsWide(ctx context.Context) ([]ListTransactionsW
 		if err := rows.Scan(
 			&i.TransactionID,
 			&i.AccountID,
-			&i.Amount,
 			&i.Direction,
+			&i.AmountMicrocredits,
 			&i.ID,
 			&i.CustomerID,
 			&i.Type,

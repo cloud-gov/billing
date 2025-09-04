@@ -51,6 +51,18 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION public.bounds_month_prev(as_of timestamp with time zone DEFAULT now(), tz text DEFAULT 'America/New_York'::text) RETURNS TABLE(period_start timestamp with time zone, period_end timestamp with time zone)
+    LANGUAGE sql IMMUTABLE
+    AS $$
+
+	WITH bounds_base AS (
+		SELECT date_trunc('month', as_of at time zone tz) AS this_month_local
+	)
+	SELECT (this_month_local - interval '1 month') AT time zone tz,
+	this_month_local AT time zone tz
+	FROM bounds_base;
+$$;
+
 CREATE FUNCTION public.river_job_state_in_bitmask(bitmask bit, state public.river_job_state) RETURNS boolean
     LANGUAGE sql IMMUTABLE
     AS $$
@@ -66,6 +78,55 @@ CREATE FUNCTION public.river_job_state_in_bitmask(bitmask bit, state public.rive
         ELSE 0
     END = 1;
 $$;
+
+CREATE FUNCTION public.update_measurement_microcredits(as_of timestamp with time zone DEFAULT now()) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	ps timestamptz;
+	pe timestamptz;
+	updated bigint;
+BEGIN
+	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
+
+	WITH measurement_amounts AS (
+		SELECT
+			r.meter AS meter,
+			r.natural_id AS resource_natural_id,
+			rd.id AS reading_id,
+			sum(p.microcredits_per_unit * m.value / p.unit) AS amount_microcredits,
+			p.id AS price_id
+		FROM reading rd
+		JOIN measurement AS m
+		ON rd.id = m.reading_id
+		JOIN resource AS r
+		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
+		JOIN price AS p
+		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
+		WHERE ps <= rd.created_at
+		AND rd.created_at < pe
+		AND m.amount_microcredits IS NULL
+		GROUP BY
+			r.meter,
+			r.natural_id,
+			rd.id,
+			p.id
+	),
+	update_measurements AS (
+		UPDATE measurement AS m
+		SET
+			amount_microcredits = ma.amount_microcredits,
+			price_id = ma.price_id
+		FROM measurement_amounts AS ma
+		WHERE
+			m.meter = ma.meter AND
+			m.resource_natural_id = ma.resource_natural_id AND
+			m.reading_id = ma.reading_id
+		RETURNING 1
+	)
+	SELECT count(*) INTO updated FROM update_measurements;
+	RETURN updated;
+END $$;
 
 SET default_tablespace = '';
 
@@ -117,16 +178,23 @@ ALTER SEQUENCE public.customer_id_seq OWNED BY public.customer.id;
 CREATE TABLE public.entry (
     transaction_id integer NOT NULL,
     account_id integer NOT NULL,
-    amount numeric(20,4) NOT NULL,
-    direction integer
+    direction integer,
+    amount_microcredits bigint
 );
 
 CREATE TABLE public.measurement (
     reading_id integer NOT NULL,
     meter text NOT NULL,
     resource_natural_id text NOT NULL,
-    value integer NOT NULL
+    value integer NOT NULL,
+    amount_microcredits bigint,
+    transaction_id bigint,
+    price_id bigint
 );
+
+COMMENT ON COLUMN public.measurement.amount_microcredits IS 'AmountMicrocredits is a denormalized column that is calculated from the Price of the ResourceKind that was applicable when the measurement was taken (based on the time of the Reading). The value is persisted here for simpler rollups and auditing.';
+
+COMMENT ON COLUMN public.measurement.transaction_id IS 'TransactionID is the transaction that accounts for this usage, typically a "post usage" transaction.';
 
 CREATE TABLE public.meter (
     name text NOT NULL,
@@ -135,13 +203,38 @@ CREATE TABLE public.meter (
 
 COMMENT ON TABLE public.meter IS 'A Meter reads usage information from a system in Cloud.gov. It also namespaces natural IDs for resources and resource_kinds; meter + natural_id is a primary key.';
 
+CREATE TABLE public.price (
+    id integer NOT NULL,
+    meter text NOT NULL,
+    kind_natural_id text NOT NULL,
+    unit_of_measure text NOT NULL,
+    microcredits_per_unit bigint NOT NULL,
+    unit bigint NOT NULL,
+    valid_during tstzrange NOT NULL
+);
+
+CREATE SEQUENCE public.price_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.price_id_seq OWNED BY public.price.id;
+
 CREATE TABLE public.reading (
     id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    periodic boolean NOT NULL
+    periodic boolean NOT NULL,
+    created_at_utc timestamp with time zone GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC'::text)) STORED
 );
 
+COMMENT ON COLUMN public.reading.created_at IS 'CreatedAt must be a time in UTC.';
+
 COMMENT ON COLUMN public.reading.periodic IS 'Periodic is true if a reading was taken automatically as part of the periodic usage measurement schedule, or false if it was requested manually.';
+
+COMMENT ON COLUMN public.reading.created_at_utc IS 'CreatedAtUTC supplements CreatedAt, which does not have a timezone. Values must be inserted into CreatedAt in UTC by the client. CreatedAt has a unique index on it to enforce readings being taken at most hourly. Because the index uses functions that are not volatility level IMMUTABLE, it cannot be used on a column with a timezone; hence the supplementary generated column.';
 
 CREATE SEQUENCE public.reading_id_seq
     AS integer
@@ -163,9 +256,7 @@ CREATE TABLE public.resource (
 CREATE TABLE public.resource_kind (
     meter text NOT NULL,
     natural_id text NOT NULL,
-    credits integer,
-    amount integer,
-    unit_of_measure text
+    name text
 );
 
 COMMENT ON TABLE public.resource_kind IS 'ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.';
@@ -207,6 +298,8 @@ ALTER TABLE ONLY public.account ALTER COLUMN id SET DEFAULT nextval('public.acco
 
 ALTER TABLE ONLY public.customer ALTER COLUMN id SET DEFAULT nextval('public.customer_id_seq'::regclass);
 
+ALTER TABLE ONLY public.price ALTER COLUMN id SET DEFAULT nextval('public.price_id_seq'::regclass);
+
 ALTER TABLE ONLY public.reading ALTER COLUMN id SET DEFAULT nextval('public.reading_id_seq'::regclass);
 
 ALTER TABLE ONLY public.tier ALTER COLUMN id SET DEFAULT nextval('public.tier_id_seq'::regclass);
@@ -230,6 +323,9 @@ ALTER TABLE ONLY public.entry
 
 ALTER TABLE ONLY public.meter
     ADD CONSTRAINT meter_name_key UNIQUE (name);
+
+ALTER TABLE ONLY public.price
+    ADD CONSTRAINT price_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.reading
     ADD CONSTRAINT reading_pkey PRIMARY KEY (id);
@@ -261,6 +357,8 @@ CREATE UNIQUE INDEX idx_resource_meter_natural_id ON public.resource USING btree
 
 COMMENT ON INDEX public.idx_resource_meter_natural_id IS 'Enables efficient deduplicated inserts using BulkCreateResources function.';
 
+CREATE INDEX reading_created_at_idx ON public.reading USING btree (created_at);
+
 CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
 
 COMMENT ON INDEX public.reading_hourly_uq IS 'Make readings unique per hour.';
@@ -289,13 +387,22 @@ ALTER TABLE ONLY public.resource_kind
     ADD CONSTRAINT fk_meter FOREIGN KEY (meter) REFERENCES public.meter(name);
 
 ALTER TABLE ONLY public.measurement
+    ADD CONSTRAINT fk_price FOREIGN KEY (price_id) REFERENCES public.price(id);
+
+ALTER TABLE ONLY public.measurement
     ADD CONSTRAINT fk_reading_id FOREIGN KEY (reading_id) REFERENCES public.reading(id);
 
 ALTER TABLE ONLY public.measurement
     ADD CONSTRAINT fk_resource_id FOREIGN KEY (meter, resource_natural_id) REFERENCES public.resource(meter, natural_id);
 
+ALTER TABLE ONLY public.price
+    ADD CONSTRAINT fk_resource_kind FOREIGN KEY (meter, kind_natural_id) REFERENCES public.resource_kind(meter, natural_id);
+
 ALTER TABLE ONLY public.customer
     ADD CONSTRAINT fk_tier_id FOREIGN KEY (tier_id) REFERENCES public.tier(id);
+
+ALTER TABLE ONLY public.measurement
+    ADD CONSTRAINT fk_transaction FOREIGN KEY (transaction_id) REFERENCES public.transaction(id);
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT fk_type_id FOREIGN KEY (type) REFERENCES public.account_type(id);

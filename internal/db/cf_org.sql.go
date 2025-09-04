@@ -24,6 +24,19 @@ func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 	return err
 }
 
+const createCFOrg = `-- name: CreateCFOrg :one
+INSERT INTO cf_org (id)
+VALUES ($1)
+RETURNING id, name, customer_id
+`
+
+func (q *Queries) CreateCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
+	row := q.db.QueryRow(ctx, createCFOrg, id)
+	var i CFOrg
+	err := row.Scan(&i.ID, &i.Name, &i.CustomerID)
+	return i, err
+}
+
 const deleteCFOrg = `-- name: DeleteCFOrg :exec
 DELETE FROM cf_org
 WHERE id = $1
