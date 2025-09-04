@@ -40,7 +40,9 @@ watchgen:
 watch:
 	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
-		set -a; source docker.env; set +a; find . -type f -name '*.go' | entr -d -r go run . ; \
+		set -a; source docker.env; set +a; \
+		find . -type f -name '*.go' \
+		| entr -d -r go run . ; \
 		sleep 0.5 ; \
 	done
 
@@ -59,24 +61,29 @@ clean: db-down
 .PHONY: db-init
 db-init:
 	@# Initialize the database.
-	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@set -a; source docker.env; PGDATABASE=postgres; set +a; \
+	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 .PHONY: db-drop
 db-drop:
 	@# Drop the database.
-	@set -a; source docker.env; PGDATABASE=postgres; set +a; go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
+	@set -a; source docker.env; PGDATABASE=postgres; set +a; \
+	go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
 
 .PHONY: db-migrate
 db-migrate: db-init
 	@# Migrate to the latest migration.
-	@set -a; source docker.env; set +a; go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@set -a; source docker.env; set +a; \
+	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@set -a; source docker.env; set +a; go tool river migrate-up
+	@set -a; source docker.env; set +a; \
+	go tool river migrate-up
 
 .PHONY: db-remigrate
 db-remigrate: db-init
 	@# Redo the latest migration in Tern.
-	@set -a; source docker.env; set +a; go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
+	@set -a; source docker.env; set +a; \
+	go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
 
 .PHONY: db-reset
 db-reset: db-drop db-init db-migrate
@@ -98,7 +105,8 @@ db-schema:
 test-db: db-down db-up db-migrate
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
-	@set -a; source docker.env; set +a; go test ./... -run TestDB -count=1
+	@set -a; source docker.env; set +a; \
+	go test ./... -run TestDB -count=1
 
 .PHONY: jwt
 jwt:
