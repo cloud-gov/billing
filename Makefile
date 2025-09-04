@@ -93,6 +93,10 @@ db-reset: db-drop db-init db-migrate
 psql:
 	@set -a; source docker.env; set +a; psql
 
+.PHONY: psql-testdb
+psql-testdb:
+	@set -a; source docker.env; PGPORT=5433; set +a; psql
+
 .PHONY: db-schema
 db-schema:
 	@set -a; source docker.env; set +a; \
@@ -102,10 +106,26 @@ db-schema:
 	> sql/schema/generated.sql
 
 .PHONY: test-db
-test-db: db-down db-up db-migrate
+test-db:
+	@# Equivalent to `make db-up` and `make db-down`, but for the ephemeral database
+	@docker compose down --volumes test-db-ephemeral
+	@docker compose up --detach --wait test-db-ephemeral
+
+	@# Equivalent to `make db-init`, but for the ephemeral database
+	@set -a; source docker.env; PGDATABASE=postgres PGPORT=5433; set +a; \
+	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+
+	@# Equivalent to `make db-migrate`, but for the ephemeral database.
+	@# Migrate to the latest migration.
+	@set -a; source docker.env; PGPORT=5433; set +a; \
+	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@# Migrate River schema to latest.
+	@set -a; source docker.env; PGPORT=5433; set +a; \
+	go tool river migrate-up
+
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
-	@set -a; source docker.env; set +a; \
+	@set -a; source docker.env; PGPORT=5433; set +a; \
 	go test ./... -run TestDB -count=1
 
 .PHONY: jwt

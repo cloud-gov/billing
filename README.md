@@ -20,21 +20,21 @@ Most development tasks can be achieved using the Make targets defined in [Makefi
 make watchgen # Watch .sql files for changes. On change, regenerate database Go bindings with sqlc. Consider running this in a separate shell at the same time as 'make watch'.
 make watch # Watch .go files for changes. On change, recompile and restart the server.
 make clean # Shut down the database if it is running and clean binary artifacts.
+make psql # Connect to the local database.
 ```
 
 To run the tests:
 
 ```sh
-make test # Run unit tests
-make test-db # Run database tests. See warning below.
+make test # Run unit tests.
+make test-db # Run database tests.
+make psql-testdb # Connect to the test database.
 ```
-
-**Warning**: `make test-db` will run `db-down`, shutting down the postgres container if it is running. This will erase all data in the database.
 
 Make request to the locally running server:
 
 ```sh
-make jwt # Get a token from the configured UAA. Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
+make jwt # Get a token from the configured UAA, based on OIDC_ISSUER host. Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
 curl -H "Authorization: bearer $(cat jwt.txt)" localhost:8080/some/path # Make a request with the authentication header set.
 ```
 
