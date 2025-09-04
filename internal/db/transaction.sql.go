@@ -17,11 +17,11 @@ INSERT INTO transaction (
 ) VALUES (
   $1, $2, $3
 )
-RETURNING id, occurred_at, description, type
+RETURNING id, occurred_at, description, type, customer_id
 `
 
 type CreateTransactionParams struct {
-	OccurredAt  pgtype.Timestamp
+	OccurredAt  pgtype.Timestamptz
 	Description pgtype.Text
 	Type        TransactionType
 }
@@ -34,12 +34,13 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		&i.OccurredAt,
 		&i.Description,
 		&i.Type,
+		&i.CustomerID,
 	)
 	return i, err
 }
 
 const getTransaction = `-- name: GetTransaction :many
-SELECT id, occurred_at, description, type FROM transaction
+SELECT id, occurred_at, description, type, customer_id FROM transaction
 WHERE id = $1 LIMIT 1
 `
 
@@ -57,6 +58,7 @@ func (q *Queries) GetTransaction(ctx context.Context, id int32) ([]Transaction, 
 			&i.OccurredAt,
 			&i.Description,
 			&i.Type,
+			&i.CustomerID,
 		); err != nil {
 			return nil, err
 		}
@@ -69,7 +71,7 @@ func (q *Queries) GetTransaction(ctx context.Context, id int32) ([]Transaction, 
 }
 
 const listTransactions = `-- name: ListTransactions :many
-SELECT id, occurred_at, description, type FROM transaction
+SELECT id, occurred_at, description, type, customer_id FROM transaction
 ORDER BY id
 `
 
@@ -87,6 +89,7 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 			&i.OccurredAt,
 			&i.Description,
 			&i.Type,
+			&i.CustomerID,
 		); err != nil {
 			return nil, err
 		}

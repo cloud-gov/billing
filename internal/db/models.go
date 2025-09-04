@@ -148,7 +148,8 @@ type Tier struct {
 
 type Transaction struct {
 	ID          int32
-	OccurredAt  pgtype.Timestamp
+	OccurredAt  pgtype.Timestamptz
 	Description pgtype.Text
 	Type        TransactionType
+	CustomerID  pgtype.Int8
 }

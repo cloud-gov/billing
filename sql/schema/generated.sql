@@ -54,7 +54,6 @@ $$;
 CREATE FUNCTION public.bounds_month_prev(as_of timestamp with time zone DEFAULT now(), tz text DEFAULT 'America/New_York'::text) RETURNS TABLE(period_start timestamp with time zone, period_end timestamp with time zone)
     LANGUAGE sql IMMUTABLE
     AS $$
-
 	WITH bounds_base AS (
 		SELECT date_trunc('month', as_of at time zone tz) AS this_month_local
 	)
@@ -62,6 +61,36 @@ CREATE FUNCTION public.bounds_month_prev(as_of timestamp with time zone DEFAULT 
 	this_month_local AT time zone tz
 	FROM bounds_base;
 $$;
+
+CREATE FUNCTION public.post_usage(as_of timestamp with time zone DEFAULT now()) RETURNS TABLE(customer_id bigint, total_amount_microcredits bigint)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	ps timestamptz;
+	pe timestamptz;
+	updated bigint;
+BEGIN
+	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
+
+	RETURN QUERY
+	WITH measurement_totals AS (
+		SELECT c.id AS customer_id, sum(m.amount_microcredits) AS total_amount_microcredits
+		FROM reading AS rd
+		JOIN measurement AS m
+		ON rd.id = m.reading_id
+		JOIN resource AS r
+		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
+		JOIN cf_org AS o
+		ON r.cf_org_id = o.id
+		JOIN customer AS c
+		ON o.customer_id = c.id
+		WHERE ps <= rd.created_at_utc
+		AND rd.created_at_utc < pe
+		AND m.amount_microcredits IS NOT NULL
+		GROUP BY c.id
+	)
+	SELECT mt.customer_id::bigint, mt.total_amount_microcredits::bigint FROM measurement_totals mt;
+END $$;
 
 CREATE FUNCTION public.river_job_state_in_bitmask(bitmask bit, state public.river_job_state) RETURNS boolean
     LANGUAGE sql IMMUTABLE
@@ -103,8 +132,8 @@ BEGIN
 		ON m.meter = r.meter AND m.resource_natural_id = r.natural_id
 		JOIN price AS p
 		ON r.meter = p.meter AND r.kind_natural_id = p.kind_natural_id
-		WHERE ps <= rd.created_at
-		AND rd.created_at < pe
+		WHERE ps <= rd.created_at_utc
+		AND rd.created_at_utc < pe
 		AND m.amount_microcredits IS NULL
 		GROUP BY
 			r.meter,
@@ -279,7 +308,7 @@ ALTER SEQUENCE public.tier_id_seq OWNED BY public.tier.id;
 
 CREATE TABLE public.transaction (
     id integer NOT NULL,
-    occurred_at timestamp without time zone,
+    occurred_at timestamp with time zone,
     description text,
     type public.transaction_type NOT NULL
 );

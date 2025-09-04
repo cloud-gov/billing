@@ -57,7 +57,8 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			q := newTx(t, conn, false)
+			q, _, rollback := newTx(t, conn)
+			defer rollback()
 
 			// Act
 			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
@@ -77,24 +78,19 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 	}
 }
 
-// newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so they receive and can roll back separate transactions. By default, the transaction is rolled back when the test completes so tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- set commit to true.
-func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
+// newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so it runs in isolation from the rest. Most callers should `defer rollback()` so database changes are rolled back and tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- call `defer commit()`.
+func newTx(t *testing.T, conn *pgxpool.Pool) (q dbx.Querier, commit func(), rollback func()) {
 	tx, err := conn.Begin(t.Context())
 	if err != nil {
 		t.Fatal("begin transaction failed", err)
 	}
-
-	if commit {
-		t.Cleanup(func() { tx.Commit(t.Context()) })
-	} else {
-		t.Cleanup(func() { tx.Rollback(t.Context()) })
-	}
-
 	// Test acquiring a connection from the pool.
 	if err = conn.Ping(t.Context()); err != nil {
 		t.Fatal("database connection ping failed")
 	}
-	return dbx.NewQuerier(db.New(conn)).WithTx(tx)
+	return dbx.NewQuerier(db.New(conn)).WithTx(tx),
+		func() { tx.Commit(t.Context()) },
+		func() { tx.Rollback(t.Context()) }
 }
 
 func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
@@ -103,7 +99,8 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	if err != nil {
 		t.Fatal("creating database connection failed", err)
 	}
-	q := newTx(t, conn, false)
+	q, _, rollback := newTx(t, conn)
+	defer rollback()
 
 	var (
 		orgID      = testutil.NewPgxUUID()
@@ -135,7 +132,6 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 				Name: meterName,
 			},
 		},
-
 		Kinds: []db.ResourceKind{
 			{
 				Meter:     meterName,
@@ -453,7 +449,8 @@ func TestDBPostUsage(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			q := newTx(t, conn, true)
+			q, _, rollback := newTx(t, conn)
+			defer rollback()
 
 			createTestData(t, q, tc.Data)
 
