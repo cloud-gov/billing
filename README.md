@@ -1,10 +1,12 @@
 # Billing service
 
-Under development.
+The billing service tracks customer usage of Cloud.gov products for billing purposes.
 
 ## Development
 
 Prerequisite: Docker must be installed and running.
+
+Copy `docker.env.example` to `docker.env` and fill in any missing values.
 
 Set up the database:
 
@@ -29,9 +31,16 @@ make test-db # Run database tests. See warning below.
 
 **Warning**: `make test-db` will run `db-down`, shutting down the postgres container if it is running. This will erase all data in the database.
 
+Make request to the locally running server:
+
+```sh
+make jwt # Get a token from the configured UAA. Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
+curl -H "Authorization: bearer $(cat jwt.txt)" localhost:8080/some/path # Make a request with the authentication header set.
+```
+
 ### Cloud Foundry
 
-As of writing, the application uses the local user's Cloud Foundry session to authenticate. You must sign into Cloud Foundry with `cf login` before starting the application.
+The application uses service account credentials to authenticate to the Cloud Foundry API (CAPI). Set `CF_CLIENT_ID` and `CF_CLIENT_SECRET` using credentials from CredHub before starting the application with `make watch`.
 
 ### Database
 

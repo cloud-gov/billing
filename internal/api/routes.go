@@ -36,10 +36,8 @@ func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.
 func adminMux(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier, config config.Config) http.Handler {
 	mux := chi.NewMux()
 
-	if !config.DebugDisableAuth {
-		hasAdminScope := middleware.NewHasScope(logger, verifier, "usage.admin")
-		mux.Use(hasAdminScope)
-	}
+	hasAdminScope := middleware.NewHasScope(logger, verifier, "usage.admin")
+	mux.Use(hasAdminScope)
 
 	mux.Post("/tier", handleCreateTier(q))
 	mux.Post("/usage/job", handleCreateUsageJob(riverc))

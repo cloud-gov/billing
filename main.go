@@ -64,9 +64,6 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmtErr(ErrBadConfig, err)
 	}
-	if c.DebugDisableAuth {
-		logger.Warn("running with API authentication disabled")
-	}
 	cfconf, err := cfconfig.New(c.CFApiUrl,
 		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {

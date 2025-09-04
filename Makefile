@@ -34,7 +34,8 @@ watchgen:
 		sleep 0.5 ; \
 	done
 
-# Run entr in a while loop because it exits when files are deleted..
+# Run entr in a while loop because it exits when files are deleted.
+# Run targets db-up and db-init before running.
 .PHONY: watch
 watch:
 	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
@@ -98,3 +99,10 @@ test-db: db-down db-up db-migrate
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
 	@set -a; source docker.env; set +a; go test ./... -run TestDB -count=1
+
+.PHONY: jwt
+jwt:
+	set -a; source docker.env; set +a; \
+	uaac target $${OIDC_ISSUER%/oauth/token};\
+	uaac token client get $$CF_CLIENT_ID -s $$CF_CLIENT_SECRET --scope "usage.admin";\
+	uaac context billing | grep access_token | awk '{print $$2}' > jwt.txt
