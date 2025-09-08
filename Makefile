@@ -130,7 +130,17 @@ test-db:
 
 .PHONY: jwt
 jwt:
-	set -a; source docker.env; set +a; \
-	uaac target $${OIDC_ISSUER%/oauth/token};\
-	uaac token client get $$CF_CLIENT_ID -s $$CF_CLIENT_SECRET --scope "usage.admin";\
+	@set -a; source docker.env; set +a; \
+	uaac target $${OIDC_ISSUER%/oauth/token}; \
+	uaac token client get $$CF_CLIENT_ID -s $$CF_CLIENT_SECRET --scope "usage.admin"; \
 	uaac context billing | grep access_token | awk '{print $$2}' > jwt.txt
+
+	@# JWTs are encoded with base64url, which `base64 -d` cannot directly parse.
+	@# Steps:
+	@# - Split on '.' and get the middle (claims) section of the token
+	@# - Replace URL-safe chars with base64 equivalents
+	@# - Add padding as needed
+	@# - Decode base64url to unicode
+	@# - Pretty print with fromjson
+	@echo "Token saved to jwt.txt. Expires at:"
+	@cat jwt.txt | jq -Rr 'split(".")[1] | gsub("-"; "+") | gsub("_"; "/") | . + (["","===","==","="][length % 4]) | @base64d | fromjson | .exp | todate'

@@ -23,7 +23,7 @@ func NewPgxTimestamptz(at time.Time) pgtype.Timestamptz {
 	return tz
 }
 
-// NewPgxTimestamptz returns a [pgtype.Timestamptz] based on the provided time.Time, or panics if the argument is not valid.
+// NewPgxTimestamp returns a [pgtype.Timestamp] based on the provided time.Time, or panics if the argument is not valid.
 func NewPgxTimestamp(at time.Time) pgtype.Timestamp {
 	ts := pgtype.Timestamp{}
 	err := ts.Scan(at)

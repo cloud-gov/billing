@@ -236,19 +236,23 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		t.Fatalf("expected %v rows updated, got %v", 2, updated.Int64)
 	}
 	ms, err := q.ListMeasurements(t.Context())
+	if err != nil {
+		t.Fatal("error listing measurements (this is a problem with the test)", err)
+	}
+
 	ms1 := ms[measurementFromReadingID(ms, readingID1)]
 	if ms1.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 1 AmountMicrocredits to be invalid, but was valid")
+		t.Logf("expected measurement 1 AmountMicrocredits to be NULL, but was NOT NULL")
 		t.Fail()
 	}
 	ms2 := ms[measurementFromReadingID(ms, readingID2)]
 	if ms2.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 2 AmountMicrocredits to be invalid, but was valid")
+		t.Logf("expected measurement 2 AmountMicrocredits to be NULL, but was NOT NULL")
 		t.Fail()
 	}
 	ms3 := ms[measurementFromReadingID(ms, readingID3)]
 	if !ms3.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 3 AmountMicrocredits to be valid, but was not")
+		t.Logf("expected measurement 3 AmountMicrocredits to be NOT NULL, but was NULL")
 		t.Fail()
 	}
 	var expectedAmount int64 = 7 * 8 / 2
@@ -257,7 +261,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	}
 	ms4 := ms[measurementFromReadingID(ms, readingID4)]
 	if !ms4.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 4 AmountMicrocredits to be valid, but was not")
+		t.Logf("expected measurement 4 AmountMicrocredits to be NOT NULL, but was NULL")
 		t.Fail()
 	}
 	if ms4.AmountMicrocredits.Int64 != expectedAmount {
@@ -265,7 +269,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	}
 	ms5 := ms[measurementFromReadingID(ms, readingID5)]
 	if !ms5.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 5 AmountMicrocredits to be valid, but was not")
+		t.Logf("expected measurement 5 AmountMicrocredits to be NOT NULL, but was NULL")
 		t.Fail()
 	}
 	if ms5.AmountMicrocredits.Int64 != expectedAmount {
@@ -273,7 +277,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	}
 	ms6 := ms[measurementFromReadingID(ms, readingID6)]
 	if ms6.AmountMicrocredits.Valid {
-		t.Logf("expected measurement 6 AmountMicrocredits to be invalid, but was valid")
+		t.Logf("expected measurement 6 AmountMicrocredits to be NULL, but was NOT NULL")
 		t.Fail()
 	}
 }
@@ -327,6 +331,10 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
 
 			// Assert
+			if err != nil {
+				t.Fatal("error calling the function under test", err)
+			}
+
 			if !result.PeriodStart.Time.Equal(tc.ExpectedPeriodStart.Time) {
 				t.Fatalf("expected period start %v, got %v", tc.ExpectedPeriodStart.Time, result.PeriodStart.Time)
 			}
