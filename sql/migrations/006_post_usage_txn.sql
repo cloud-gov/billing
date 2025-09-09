@@ -37,7 +37,7 @@ BEGIN
 		GROUP BY c.id
 	),
 	ins_tx AS (
-		INSERT INTO transaction(customer_id, occurred_at, description, type)
+		INSERT INTO transaction AS txn(customer_id, occurred_at, description, type)
 		SELECT
 			mt.customer_id,
 			pe,
@@ -45,31 +45,33 @@ BEGIN
 			'usage_post'
 		FROM measurement_totals AS mt
 		WHERE mt.total_amount_microcredits <> 0
-		RETURNING id, customer_id
+		RETURNING txn.id, txn.customer_id
 	),
 	ins_entries AS (
-		INSERT INTO entry(transaction_id, account_id, direction, amount_microcredits)
+		INSERT INTO entry AS e(transaction_id, account_id, direction, amount_microcredits)
 		SELECT
 			it.id,
-			e.account_id,
-			e.normal,
+			ac.account_id,
+			ac.normal,
 			mt.total_amount_microcredits
 		FROM ins_tx AS it
 		JOIN measurement_totals AS mt
 		ON it.customer_id = mt.customer_id
 		JOIN LATERAL (
-			SELECT a.id, a.normal
+			SELECT a.id, at.normal
 			FROM account AS a
 			JOIN account_type AS at
 			ON a.id = at.id
 			WHERE a.customer_id = it.customer_id
-			AND (a.name = 'credit_pool' OR a.name = 'credits_used')
+			AND (at.name = 'credit_pool' OR at.name = 'credits_used')
 			LIMIT 2
-		) AS e(account_id, normal) ON TRUE
-		RETURNING transaction_id
+		) AS ac(account_id, normal) ON TRUE
+		RETURNING e.transaction_id
 	)
 	SELECT mt.customer_id::bigint, mt.total_amount_microcredits::bigint FROM measurement_totals mt;
 END $$;
+
+COMMENT ON FUNCTION post_usage IS 'posts_usage returns ';
 
 ---- create above / drop below ----
 

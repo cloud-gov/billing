@@ -80,6 +80,8 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 
 // newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so it runs in isolation from the rest. Most callers should `defer rollback()` so database changes are rolled back and tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- call `defer commit()`.
 func newTx(t *testing.T, conn *pgxpool.Pool) (q dbx.Querier, commit func(), rollback func()) {
+	t.Helper()
+
 	tx, err := conn.Begin(t.Context())
 	if err != nil {
 		t.Fatal("begin transaction failed", err)
@@ -89,8 +91,21 @@ func newTx(t *testing.T, conn *pgxpool.Pool) (q dbx.Querier, commit func(), roll
 		t.Fatal("database connection ping failed")
 	}
 	return dbx.NewQuerier(db.New(conn)).WithTx(tx),
-		func() { tx.Commit(t.Context()) },
-		func() { tx.Rollback(t.Context()) }
+		func() {
+			t.Helper()
+			err = tx.Commit(t.Context())
+			if err != nil {
+				t.Fatal("failed to commit transaction: ", err)
+			}
+		},
+		func() {
+			t.Helper()
+			tx.Rollback(t.Context())
+			// Ignore error if the transaction was already committed
+			if err != nil && !errors.Is(pgx.ErrTxClosed, err) {
+				t.Fatal("failed to rollback transaction: ", err)
+			}
+		}
 }
 
 func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
@@ -456,6 +471,9 @@ func TestDBPostUsage(t *testing.T) {
 
 			// Act
 			results, err := q.PostUsage(t.Context(), tc.AsOf)
+			if err != nil {
+				t.Fatal("error calling function under test: ", err)
+			}
 
 			// Assert
 			if len(results) != 1 {
