@@ -1,6 +1,7 @@
 package dbx_test
 
 import (
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -8,13 +9,17 @@ import (
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/testutil"
+	"github.com/google/go-cmp/cmp"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // testData is used to populate the database with rows required to perform a test.
 type testData struct {
+	Accounts     []db.Account
 	Customers    []db.Customer
+	Entries      []db.Entry
 	Kinds        []db.ResourceKind
 	Measurements []db.Measurement
 	Meters       []db.Meter
@@ -22,6 +27,7 @@ type testData struct {
 	Prices       []db.Price
 	Readings     []db.Reading
 	Resources    []db.Resource
+	Transactions []db.Transaction
 }
 
 func TestDBBoundsMonthPrev(t *testing.T) {
@@ -67,7 +73,7 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 			if err != nil {
 				t.Fatal("error calling the function under test", err)
 			}
-			
+
 			if !result.PeriodStart.Time.Equal(tc.ExpectedPeriodStart.Time) {
 				t.Fatalf("expected period start %v, got %v", tc.ExpectedPeriodStart.Time, result.PeriodStart.Time)
 			}
@@ -335,17 +341,19 @@ func TestDBPostUsage(t *testing.T) {
 		tz, _              = time.LoadLocation("America/New_York")
 		utc, _             = time.LoadLocation("")
 		asOf               = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
+		periodEnd          = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
 	)
 
 	testCases := []struct {
-		Name string
-		AsOf pgtype.Timestamptz
-		Data testData
+		Name   string
+		AsOf   pgtype.Timestamptz
+		Before testData
+		After  testData
 	}{
 		{
 			Name: "",
 			AsOf: asOf,
-			Data: testData{
+			Before: testData{
 				Customers: []db.Customer{
 					{
 						ID: customerID,
@@ -454,6 +462,17 @@ func TestDBPostUsage(t *testing.T) {
 					},
 				},
 			},
+			After: testData{
+				Transactions: []db.Transaction{
+					{
+						ID:          1,
+						OccurredAt:  periodEnd,
+						Description: pgtype.Text{String: "Monthly usage 2025-02-01--2025-03-01", Valid: true},
+						Type:        db.TransactionTypeUsagePost,
+						CustomerID:  pgtype.Int8{Int64: customerID, Valid: true},
+					},
+				},
+			},
 		},
 	}
 
@@ -467,7 +486,7 @@ func TestDBPostUsage(t *testing.T) {
 			q, _, rollback := newTx(t, conn)
 			defer rollback()
 
-			createTestData(t, q, tc.Data)
+			createTestData(t, q, tc.Before)
 
 			// Act
 			results, err := q.PostUsage(t.Context(), tc.AsOf)
@@ -476,18 +495,20 @@ func TestDBPostUsage(t *testing.T) {
 			}
 
 			// Assert
-			if len(results) != 1 {
-				t.Fatalf("expected 1 row returned, got %v", len(results))
+			if len(results) != 2 {
+				t.Fatalf("expected 2 rows returned, got %v", len(results))
 			}
 			if total := results[0].TotalAmountMicrocredits.Int64; total != 3*56 {
 				t.Fatalf("expected total %v, got %v", 3*56, total)
 			}
+			assertDBContains(t, q, tc.After)
 		})
 	}
 }
 
 // createTestData creates a row for each struct in the provided data. It uses the Create methods from q, which may have additional effects.
 func createTestData(t *testing.T, q db.Querier, td testData) {
+	t.Helper()
 	// Order of creation depends on fkey dependencies.
 	for _, i := range td.Customers {
 		_, err := q.CreateCustomer(t.Context(), i.Name)
@@ -546,5 +567,54 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 			Value:              i.Value,
 			AmountMicrocredits: i.AmountMicrocredits,
 		})
+	}
+}
+
+// assertDBContains checks if each element in td exists in the database. Missing elements are collected with t.Fail(). The test is only ended with t.Fatal() if a query returns an error.
+func assertDBContains(t *testing.T, q db.Querier, td testData) {
+	t.Helper()
+	for _, want := range td.Customers {
+		have, err := q.GetCustomer(t.Context(), want.ID)
+		if err != nil {
+			t.Fatal("getting customer", err)
+		}
+		if !cmp.Equal(have, want) {
+			t.Logf("expected customer %v, got %v", want, have)
+			t.Fail()
+		}
+	}
+	for _, want := range td.Kinds {
+		have, err := q.GetResourceKind(t.Context(), db.GetResourceKindParams{
+			Meter:     want.Meter,
+			NaturalID: want.NaturalID,
+		})
+		if err != nil {
+			t.Fatal("getting ResourceKind", err)
+		}
+		if !cmp.Equal(have, want) {
+			t.Logf("expected ResourceKind %v, got %v", want, have)
+			t.Fail()
+		}
+	}
+	// TODO Measurements, Meters, Prices, Readings (no Get methods on q yet)
+	for _, want := range td.Orgs {
+		have, err := q.GetCFOrg(t.Context(), want.ID)
+		if err != nil {
+			t.Fatal("getting CFOrg", err)
+		}
+		if !cmp.Equal(have, want) {
+			t.Logf("expected CFOrg %v, got %v", want, have)
+			t.Fail()
+		}
+	}
+	for _, want := range td.Transactions {
+		have, err := q.GetTransaction(t.Context(), want.ID)
+		if err != nil {
+			t.Fatal("getting transaction", err)
+		}
+		if !cmp.Equal(have, want) {
+			t.Logf("expected Transaction %v, got %v", want, have)
+			t.Fail()
+		}
 	}
 }

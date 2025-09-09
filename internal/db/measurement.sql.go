@@ -143,12 +143,15 @@ func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
 }
 
 const postUsage = `-- name: PostUsage :many
-SELECT customer_id, total_amount_microcredits
+SELECT customer_id, transaction_id, account_id, direction, total_amount_microcredits
 FROM post_usage($1)
 `
 
 type PostUsageRow struct {
 	CustomerID              pgtype.Int8
+	TransactionID           pgtype.Int4
+	AccountID               pgtype.Int4
+	Direction               pgtype.Int4
 	TotalAmountMicrocredits pgtype.Int8
 }
 
@@ -161,7 +164,13 @@ func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]Pos
 	var items []PostUsageRow
 	for rows.Next() {
 		var i PostUsageRow
-		if err := rows.Scan(&i.CustomerID, &i.TotalAmountMicrocredits); err != nil {
+		if err := rows.Scan(
+			&i.CustomerID,
+			&i.TransactionID,
+			&i.AccountID,
+			&i.Direction,
+			&i.TotalAmountMicrocredits,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

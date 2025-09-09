@@ -8,6 +8,9 @@ CREATE OR REPLACE FUNCTION post_usage (
 )
 RETURNS table(
 	customer_id bigint,
+	transaction_id integer,
+	account_id integer,
+	direction integer,
 	total_amount_microcredits bigint
 )
 LANGUAGE plpgsql
@@ -18,8 +21,8 @@ DECLARE
 BEGIN
 	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
 
-	-- Get total microcredits per customer
 	RETURN QUERY
+	-- Step 1: Calculate total credits for measurements in period
 	WITH measurement_totals AS (
 		SELECT c.id AS customer_id, sum(m.amount_microcredits) AS total_amount_microcredits
 		FROM reading AS rd
@@ -36,17 +39,19 @@ BEGIN
 		AND m.amount_microcredits IS NOT NULL
 		GROUP BY c.id
 	),
+	-- Step 2: Create a transaction row for each customer with nonzero usage
 	ins_tx AS (
 		INSERT INTO transaction AS txn(customer_id, occurred_at, description, type)
 		SELECT
 			mt.customer_id,
 			pe,
-			format('Monthly usage %s-%s', to_char(ps, 'YYYY-MM-DD'), to_char(pe, 'YYYY-MM-DD')),
+			format('Monthly usage %s--%s', to_char(ps, 'YYYY-MM-DD'), to_char(pe, 'YYYY-MM-DD')),
 			'usage_post'
 		FROM measurement_totals AS mt
 		WHERE mt.total_amount_microcredits <> 0
 		RETURNING txn.id, txn.customer_id
 	),
+	-- Step 3: Insert two entries for each transaction with credits calculated earlier
 	ins_entries AS (
 		INSERT INTO entry AS e(transaction_id, account_id, direction, amount_microcredits)
 		SELECT
@@ -61,18 +66,68 @@ BEGIN
 			SELECT a.id, at.normal
 			FROM account AS a
 			JOIN account_type AS at
-			ON a.id = at.id
+			ON a.type = at.id
 			WHERE a.customer_id = it.customer_id
 			AND (at.name = 'credit_pool' OR at.name = 'credits_used')
 			LIMIT 2
 		) AS ac(account_id, normal) ON TRUE
-		RETURNING e.transaction_id
+		RETURNING e.transaction_id, e.account_id, e.direction, e.amount_microcredits
 	)
-	SELECT mt.customer_id::bigint, mt.total_amount_microcredits::bigint FROM measurement_totals mt;
+	-- Step 4: Return all entries created by the function
+	SELECT
+		tx.customer_id,
+		e.transaction_id,
+		e.account_id,
+		e.direction,
+		e.amount_microcredits
+	FROM ins_tx AS tx
+	JOIN ins_entries AS e
+	ON tx.id = e.transaction_id;
 END $$;
 
-COMMENT ON FUNCTION post_usage IS 'posts_usage returns ';
+COMMENT ON FUNCTION post_usage IS 'posts_usage returns all entries, plus their associated customer_id. This function must be run in a transaction.';
+
+CREATE OR REPLACE FUNCTION assert_transaction_balances()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	v_tx bigint := COALESCE(NEW.transaction_id, OLD.transaction_id);
+	v_sum bigint;
+BEGIN
+	SELECT (COALESCE(SUM(e.amount_microcredits * e.direction), 0))
+	INTO v_sum
+	FROM entry e
+	WHERE transaction_id = v_tx;
+
+	IF v_sum <> 0 THEN
+		RAISE EXCEPTION
+			USING
+				ERRCODE = '23514', -- check violation
+				MESSAGE = format('ledger error: transaction %s is not balanced; sum(amount_microcredits)=%s', v_tx, v_sum);
+	END IF;
+	RETURN NULL;
+END;
+$$;
 
 ---- create above / drop below ----
 
 DROP FUNCTION IF EXISTS post_usage;
+
+-- Restore previous version of assert_transaction_balances from migration 004
+CREATE OR REPLACE FUNCTION assert_transaction_balances()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+	PERFORM 1
+	FROM entry e
+	GROUP BY e.transaction_id
+	HAVING SUM(e.amount) <> 0;
+
+	IF FOUND THEN
+		RAISE EXCEPTION
+		  'ledger error: at least one transaction is not balanced (sum(amount) <> 0)';
+	END IF;
+
+	RETURN NULL;
+END;
+$$;

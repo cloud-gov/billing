@@ -147,7 +147,7 @@ func (s *stubQuerier) GetResourceKind(_ context.Context, arg db.GetResourceKindP
 func (s *stubQuerier) GetTier(_ context.Context, id int32) (db.Tier, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetTransaction(_ context.Context, id int32) ([]db.Transaction, error) {
+func (s *stubQuerier) GetTransaction(_ context.Context, id int32) (db.Transaction, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListCFOrgs(_ context.Context) ([]db.CFOrg, error) {

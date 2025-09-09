@@ -3,7 +3,7 @@
 SELECT * FROM transaction
 ORDER BY id;
 
--- name: GetTransaction :many
+-- name: GetTransaction :one
 SELECT * FROM transaction
 WHERE id = $1 LIMIT 1;
 

@@ -39,35 +39,22 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 	return i, err
 }
 
-const getTransaction = `-- name: GetTransaction :many
+const getTransaction = `-- name: GetTransaction :one
 SELECT id, occurred_at, description, type, customer_id FROM transaction
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetTransaction(ctx context.Context, id int32) ([]Transaction, error) {
-	rows, err := q.db.Query(ctx, getTransaction, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Transaction
-	for rows.Next() {
-		var i Transaction
-		if err := rows.Scan(
-			&i.ID,
-			&i.OccurredAt,
-			&i.Description,
-			&i.Type,
-			&i.CustomerID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetTransaction(ctx context.Context, id int32) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getTransaction, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.OccurredAt,
+		&i.Description,
+		&i.Type,
+		&i.CustomerID,
+	)
+	return i, err
 }
 
 const listTransactions = `-- name: ListTransactions :many

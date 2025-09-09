@@ -48,5 +48,5 @@ SELECT *
 FROM measurement;
 
 -- name: PostUsage :many
-SELECT customer_id, total_amount_microcredits
+SELECT customer_id, transaction_id, account_id, direction, total_amount_microcredits
 FROM post_usage($1);

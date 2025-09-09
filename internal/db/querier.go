@@ -53,7 +53,7 @@ type Querier interface {
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
-	GetTransaction(ctx context.Context, id int32) ([]Transaction, error)
+	GetTransaction(ctx context.Context, id int32) (Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListMeasurements(ctx context.Context) ([]Measurement, error)
