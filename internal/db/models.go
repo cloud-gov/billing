@@ -60,8 +60,8 @@ func (ns NullTransactionType) Value() (driver.Value, error) {
 
 type Account struct {
 	ID         int32
-	CustomerID pgtype.Int8
-	Type       pgtype.Int4
+	CustomerID int64
+	Type       int32
 }
 
 type AccountType struct {
@@ -85,7 +85,7 @@ type Customer struct {
 type Entry struct {
 	TransactionID      int32
 	AccountID          int32
-	Direction          pgtype.Int4
+	Direction          int32
 	AmountMicrocredits pgtype.Int8
 }
 

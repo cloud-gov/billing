@@ -99,7 +99,7 @@ FROM
 type ListTransactionsWideRow struct {
 	TransactionID      int32
 	AccountID          int32
-	Direction          pgtype.Int4
+	Direction          int32
 	AmountMicrocredits pgtype.Int8
 	ID                 pgtype.Int4
 	CustomerID         pgtype.Int8

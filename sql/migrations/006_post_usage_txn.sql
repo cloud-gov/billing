@@ -110,6 +110,13 @@ BEGIN
 END;
 $$;
 
+ALTER TABLE entry
+ALTER COLUMN direction SET NOT NULL;
+
+ALTER TABLE account
+ALTER COLUMN customer_id SET NOT NULL,
+ALTER COLUMN type SET NOT NULL;
+
 ---- create above / drop below ----
 
 DROP FUNCTION IF EXISTS post_usage;
@@ -131,3 +138,10 @@ BEGIN
 	RETURN NULL;
 END;
 $$;
+
+ALTER TABLE entry
+ALTER COLUMN direction DROP NOT NULL;
+
+ALTER TABLE account
+ALTER COLUMN customer_id DROP NOT NULL,
+ALTER COLUMN type DROP NOT NULL;

@@ -1,6 +1,7 @@
 package dbx_test
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
@@ -63,8 +64,7 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			q, _, rollback := newTx(t, conn)
-			defer rollback()
+			q := newTx(t, conn, false)
 
 			// Act
 			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
@@ -85,33 +85,38 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 }
 
 // newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so it runs in isolation from the rest. Most callers should `defer rollback()` so database changes are rolled back and tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- call `defer commit()`.
-func newTx(t *testing.T, conn *pgxpool.Pool) (q dbx.Querier, commit func(), rollback func()) {
+func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
 	t.Helper()
+	// t.Context() can be cancelled before we have a chance to commit, so create a new context instead.
+	ctx := context.Background()
 
-	tx, err := conn.Begin(t.Context())
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal("begin transaction failed", err)
 	}
 	// Test acquiring a connection from the pool.
-	if err = conn.Ping(t.Context()); err != nil {
+	if err = conn.Ping(ctx); err != nil {
 		t.Fatal("database connection ping failed")
 	}
-	return dbx.NewQuerier(db.New(conn)).WithTx(tx),
-		func() {
-			t.Helper()
-			err = tx.Commit(t.Context())
+
+	if commit {
+		t.Cleanup(func() {
+			err = tx.Commit(ctx)
 			if err != nil {
 				t.Fatal("failed to commit transaction: ", err)
 			}
-		},
-		func() {
-			t.Helper()
-			tx.Rollback(t.Context())
+		})
+	} else {
+		t.Cleanup(func() {
+			tx.Rollback(ctx)
 			// Ignore error if the transaction was already committed
 			if err != nil && !errors.Is(pgx.ErrTxClosed, err) {
 				t.Fatal("failed to rollback transaction: ", err)
 			}
-		}
+		})
+	}
+
+	return dbx.NewQuerier(db.New(conn)).WithTx(tx)
 }
 
 func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
@@ -120,8 +125,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	if err != nil {
 		t.Fatal("creating database connection failed", err)
 	}
-	q, _, rollback := newTx(t, conn)
-	defer rollback()
+	q := newTx(t, conn, false)
 
 	var (
 		orgID      = testutil.NewPgxUUID()
@@ -463,6 +467,33 @@ func TestDBPostUsage(t *testing.T) {
 				},
 			},
 			After: testData{
+				// Accounts are automatically created when the CF Org is created
+				Accounts: []db.Account{
+					{
+						ID:         2,
+						CustomerID: 1,
+						Type:       201,
+					},
+					{
+						ID:         4,
+						CustomerID: 1,
+						Type:       401,
+					},
+				},
+				Entries: []db.Entry{
+					{
+						TransactionID:      1,
+						AccountID:          2,
+						Direction:          -1,
+						AmountMicrocredits: pgtype.Int8{Int64: amountMicrocredits.Int64 * 3, Valid: true},
+					},
+					{
+						TransactionID:      1,
+						AccountID:          4,
+						Direction:          1,
+						AmountMicrocredits: pgtype.Int8{Int64: amountMicrocredits.Int64 * 3, Valid: true},
+					},
+				},
 				Transactions: []db.Transaction{
 					{
 						ID:          1,
@@ -483,8 +514,7 @@ func TestDBPostUsage(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			q, _, rollback := newTx(t, conn)
-			defer rollback()
+			q := newTx(t, conn, true)
 
 			createTestData(t, q, tc.Before)
 
@@ -571,6 +601,7 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 }
 
 // assertDBContains checks if each element in td exists in the database. Missing elements are collected with t.Fail(). The test is only ended with t.Fatal() if a query returns an error.
+// TODO: Does not check Meters, Prices, Readings (no Get methods on q yet)
 func assertDBContains(t *testing.T, q db.Querier, td testData) {
 	t.Helper()
 	for _, want := range td.Customers {
@@ -591,18 +622,17 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 		if err != nil {
 			t.Fatal("getting ResourceKind", err)
 		}
-		if !cmp.Equal(have, want) {
+		if !cmp.Equal(want, have) {
 			t.Logf("expected ResourceKind %v, got %v", want, have)
 			t.Fail()
 		}
 	}
-	// TODO Measurements, Meters, Prices, Readings (no Get methods on q yet)
 	for _, want := range td.Orgs {
 		have, err := q.GetCFOrg(t.Context(), want.ID)
 		if err != nil {
 			t.Fatal("getting CFOrg", err)
 		}
-		if !cmp.Equal(have, want) {
+		if !cmp.Equal(want, have) {
 			t.Logf("expected CFOrg %v, got %v", want, have)
 			t.Fail()
 		}
@@ -612,8 +642,21 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 		if err != nil {
 			t.Fatal("getting transaction", err)
 		}
-		if !cmp.Equal(have, want) {
+		if !cmp.Equal(want, have) {
 			t.Logf("expected Transaction %v, got %v", want, have)
+			t.Fail()
+		}
+	}
+	for _, want := range td.Entries {
+		have, err := q.GetEntry(t.Context(), db.GetEntryParams{
+			TransactionID: want.TransactionID,
+			AccountID:     want.AccountID,
+		})
+		if err != nil {
+			t.Fatal("getting entry", err)
+		}
+		if !cmp.Equal(want, have) {
+			t.Logf("expected Entry %v, got %v", want, have)
 			t.Fail()
 		}
 	}
