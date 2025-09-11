@@ -41,6 +41,7 @@ func New() (Config, error) {
 	err := c.LogLevel.UnmarshalText([]byte(levelString))
 	if err != nil {
 		c.LogLevel = slog.LevelInfo
+	}
 	c.Issuer = os.Getenv("OIDC_ISSUER")
 	if c.Issuer == "" {
 		return Config{}, errors.New("reading OIDC_ISSUER")
