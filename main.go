@@ -140,7 +140,6 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 
 	logger.Debug("run: starting web server")
-	srv := server.New( api.Routes(logger, cfclient, q, riverc), logger)
 	srv := server.New(c.Host, c.Port, api.Routes(logger, cfclient, q, riverc, verifier), logger)
 	srv.ListenAndServe(ctx)
 	return nil
