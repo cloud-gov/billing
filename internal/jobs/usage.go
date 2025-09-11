@@ -81,10 +81,10 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 }
 
 // NewMeasureUsageWorker stores dependencies required for job execution and returns a new worker.
-func NewMeasureUsageWorker(l *slog.Logger, c *pgxpool.Pool, q dbtx.Querier, r *reader.Reader) (*MeasureUsageWorker, error) {
+func NewMeasureUsageWorker(l *slog.Logger, c *pgxpool.Pool, q dbtx.Querier, r *reader.Reader) *MeasureUsageWorker {
 	logger = l
 	conn = c
 	querier = q
 	rdr = r
-	return &MeasureUsageWorker{}, nil
+	return &MeasureUsageWorker{}
 }

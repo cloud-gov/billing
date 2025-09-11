@@ -7,18 +7,20 @@ import (
 )
 
 type Config struct {
-	ApiUrl         string
+	CFApiUrl string
+	// CFClientID is the ID of the client created in UAA with permission to read data from CAPI. Because the billing service is the resource server in the OIDC relationship, it doubles as the audience claim in JWTs.
 	CFClientId     string
 	CFClientSecret string
 	Host           string
 	Port           string
 	LogLevel       slog.Level
+	Issuer         string
 }
 
 func New() (Config, error) {
 	c := Config{}
-	c.ApiUrl = os.Getenv("CF_API_URL")
-	if c.ApiUrl == "" {
+	c.CFApiUrl = os.Getenv("CF_API_URL")
+	if c.CFApiUrl == "" {
 		return Config{}, errors.New("reading CF_API_URL")
 	}
 	c.CFClientId = os.Getenv("CF_CLIENT_ID")
@@ -39,6 +41,9 @@ func New() (Config, error) {
 	err := c.LogLevel.UnmarshalText([]byte(levelString))
 	if err != nil {
 		c.LogLevel = slog.LevelInfo
+	c.Issuer = os.Getenv("OIDC_ISSUER")
+	if c.Issuer == "" {
+		return Config{}, errors.New("reading OIDC_ISSUER")
 	}
 	return c, nil
 }

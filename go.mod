@@ -4,8 +4,11 @@ go 1.24
 
 require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12.0.20250605163211-41fbb9ee824a
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/coreos/go-oidc/v3 v3.14.1
+	github.com/go-chi/chi/v5 v5.2.2
+	github.com/go-chi/httplog/v3 v3.2.2
 	github.com/jackc/pgx/v5 v5.7.5
+	github.com/jackc/tern/v2 v2.3.3
 	github.com/riverqueue/river v0.23.1
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
 	github.com/robfig/cron/v3 v3.0.1
@@ -23,6 +26,7 @@ require (
 	github.com/cubicdaiya/gonp v1.0.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/google/cel-go v0.24.1 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
@@ -30,7 +34,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/jackc/tern/v2 v2.3.3 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/lmittmann/tint v1.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

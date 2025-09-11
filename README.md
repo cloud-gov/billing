@@ -28,6 +28,14 @@ As of writing, the application uses the local user's Cloud Foundry session to au
 
 Note that table name `schema_version` is reserved by tern for tracking migration status.
 
+### Dependencies
+
+Why does this project use the packages that it does?
+
+- `jackc/pgx` is used because sqlc supports it, and unlike `database/sql` it supports COPY and the postgres binary protocol, which is faster than the SQL textual protocol.
+- `jackc/tern` is used for migrations because we already use another package by `jackc`, `pgx`, and sqlc supports it.
+- `coreos/go-oidc` is used for JWT validation over alternatives because it is maintained by a reputable organization (CoreOS) and supports JWKS discovery.
+
 ### Environment variables
 
 - Postgres and AWS use their conventional environment variables for configuration. See [Postgres docs](https://www.postgresql.org/docs/current/libpq-envars.html) and [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html).
