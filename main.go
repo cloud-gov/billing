@@ -52,15 +52,14 @@ func run(ctx context.Context, out io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
-	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-
-	logger.Debug("run: initializing CF client")
 	c, err := config.New()
 	if err != nil {
 		return fmtErr(ErrBadConfig, err)
 	}
+	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
+		Level: c.LogLevel,
+	}))
+	logger.Debug("run: initializing CF client")
 	cfconf, err := cfconfig.New(c.ApiUrl,
 		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {
