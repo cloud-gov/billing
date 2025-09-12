@@ -9,10 +9,9 @@ import (
 
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbx"
-	"github.com/cloud-gov/billing/internal/testutil"
+	. "github.com/cloud-gov/billing/internal/testutil"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -53,16 +52,16 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 		{
 			Name:                "AsOf on exclusive upper bound",
 			Tz:                  tz,
-			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			AsOf:                PgTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: PgTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   PgTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
 		},
 		{
 			Name:                "AsOf mid-month",
 			Tz:                  tz,
-			AsOf:                testutil.NewPgxTimestamptz(time.Date(2025, time.February, 15, 0, 0, 0, 0, tz)),
-			ExpectedPeriodStart: testutil.NewPgxTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
-			ExpectedPeriodEnd:   testutil.NewPgxTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
+			AsOf:                PgTimestamptz(time.Date(2025, time.February, 15, 0, 0, 0, 0, tz)),
+			ExpectedPeriodStart: PgTimestamptz(time.Date(2025, time.January, 1, 0, 0, 0, 0, tz)),
+			ExpectedPeriodEnd:   PgTimestamptz(time.Date(2025, time.February, 1, 0, 0, 0, 0, tz)),
 		},
 	}
 
@@ -137,7 +136,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	q := newTx(t, conn, false)
 
 	var (
-		orgID      = testutil.NewPgxUUID()
+		orgID      = PgUUID()
 		meterName  = "meter-1"
 		kindID     = "kind-1"
 		priceID    = int32(1)
@@ -150,9 +149,9 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		resourceID = "resource-1"
 		tz, _      = time.LoadLocation("America/New_York")
 		utc, _     = time.LoadLocation("")
-		priceLower = testutil.NewPgxTimestamptz(time.Date(2024, time.March, 1, 0, 0, 0, 0, tz))
-		priceUpper = testutil.NewPgxTimestamptz(time.Date(2026, time.March, 1, 0, 0, 0, 0, tz))
-		asOf       = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 2, 0, 0, 0, 0, tz))
+		priceLower = PgTimestamptz(time.Date(2024, time.March, 1, 0, 0, 0, 0, tz))
+		priceUpper = PgTimestamptz(time.Date(2026, time.March, 1, 0, 0, 0, 0, tz))
+		asOf       = PgTimestamptz(time.Date(2025, time.March, 2, 0, 0, 0, 0, tz))
 	)
 
 	td := testData{
@@ -195,32 +194,32 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 		Readings: []db.Reading{
 			{
 				ID:        readingID1,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
 				// One month before bounds
 			},
 			{
 				ID:        readingID2,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
 				// Correct first day of bounds, but before start of day ET
 			},
 			{
 				ID:        readingID3,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
 				// Correct first day of bounds, and at start of day ET, inclusive
 			},
 			{
 				ID:        readingID4,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
 				// Correct month, mid-month
 			},
 			{
 				ID:        readingID5,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
 				// Next month in UTC, still previous day in ET
 			},
 			{
 				ID:        readingID6,
-				CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
+				CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
 				// Next month in UTC and ET
 			},
 		},
@@ -344,9 +343,9 @@ func TestDBPostUsage(t *testing.T) {
 		customer2ID        = int64(2)
 		customer1Name      = "customer1"
 		customer2Name      = "customer2"
-		org1ID             = testutil.NewPgxUUID()
-		org2ID             = testutil.NewPgxUUID()
-		org3ID             = testutil.NewPgxUUID()
+		org1ID             = PgUUID()
+		org2ID             = PgUUID()
+		org3ID             = PgUUID()
 		meterName          = "meter-1"
 		kindID             = "kind-1"
 		readingID1         = int32(1)
@@ -357,11 +356,11 @@ func TestDBPostUsage(t *testing.T) {
 		readingID6         = int32(6)
 		resource1ID        = "resource-1"
 		resource2ID        = "resource-2"
-		amountMicrocredits = pgInt8(56)
+		amountMicrocredits = PgInt8(56)
 		tz, _              = time.LoadLocation("America/New_York")
 		utc, _             = time.LoadLocation("")
-		asOf               = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
-		periodEnd          = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
+		asOf               = PgTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
+		periodEnd          = PgTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
 	)
 
 	testCases := []struct {
@@ -405,32 +404,32 @@ func TestDBPostUsage(t *testing.T) {
 				Readings: []db.Reading{
 					{
 						ID:        readingID1,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.January, 1, 0, 0, 0, 0, utc)),
 						// One month before bounds
 					},
 					{
 						ID:        readingID2,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
 						// Correct first day of bounds, but before start of day ET
 					},
 					{
 						ID:        readingID3,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
 						// Correct first day of bounds, and at start of day ET, inclusive
 					},
 					{
 						ID:        readingID4,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.February, 3, 0, 0, 0, 0, utc)),
 						// Correct month, mid-month
 					},
 					{
 						ID:        readingID5,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
 						// Next month in UTC, still previous day in ET
 					},
 					{
 						ID:        readingID6,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 5, 0, 0, 0, utc)),
 						// Next month in UTC and ET
 					},
 				},
@@ -571,17 +570,17 @@ func TestDBPostUsage(t *testing.T) {
 				Readings: []db.Reading{
 					{
 						ID:        readingID1,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
 						// Correct first day of bounds, but before start of day ET
 					},
 					{
 						ID:        readingID2,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
 						// Correct first day of bounds, and at start of day ET, inclusive
 					},
 					{
 						ID:        readingID3,
-						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+						CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
 						// Next month in UTC, still previous day in ET
 					},
 				},
@@ -717,7 +716,7 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatal("creating CFOrg: could not look up customer ID by name in CustomerIDs map (did you declare it in testData and include a name?)")
 			}
-			v.CFOrg.CustomerID = pgInt8(customerID)
+			v.CFOrg.CustomerID = PgInt8(customerID)
 		}
 		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(v.CFOrg))
 		if err != nil {
@@ -831,19 +830,5 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			t.Logf("expected Entry %v, got %v", want, have)
 			t.Fail()
 		}
-	}
-}
-
-func pgInt8(v int64) pgtype.Int8 {
-	return pgtype.Int8{
-		Int64: v,
-		Valid: true,
-	}
-}
-
-func pgInt4(v int32) pgtype.Int4 {
-	return pgtype.Int4{
-		Int32: v,
-		Valid: true,
 	}
 }
