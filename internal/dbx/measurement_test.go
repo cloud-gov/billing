@@ -93,6 +93,8 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 }
 
 // newTx creates a new [dbx.Querier] and starts a transaction. Each test should call this function separately so it runs in isolation from the rest. Most callers should `defer rollback()` so database changes are rolled back and tests do not interfere with each other. To commit the results instead -- for example, to debug a failing test -- call `defer commit()`.
+//
+// Note that isolation is not perfect between tests, even when transactions are rolled back. For example, the sequence used to generate an auto-incrementing ID will not decrement when a transaction is rolled back; the next transaction will start from the incremented sequence. Avoid hardcoding generated IDs for this reason.
 func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
 	t.Helper()
 	// t.Context() can be cancelled before we have a chance to commit, so create a new context instead.
@@ -171,7 +173,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 			{
 				Meter:     meterName,
 				NaturalID: kindID,
-				Name:      pgtype.Text{String: "", Valid: true},
+				Name:      PgText(""),
 			},
 		},
 		Prices: []db.Price{
@@ -340,7 +342,6 @@ func TestDBPostUsage(t *testing.T) {
 
 	var (
 		customer1ID        = int64(1)
-		customer2ID        = int64(2)
 		customer1Name      = "customer1"
 		customer2Name      = "customer2"
 		org1ID             = PgUUID()
@@ -377,7 +378,6 @@ func TestDBPostUsage(t *testing.T) {
 				CustomerIDs: map[string]int64{},
 				Customers: []db.Customer{
 					{
-						ID:   customer1ID,
 						Name: customer1Name,
 					},
 				},
@@ -398,7 +398,7 @@ func TestDBPostUsage(t *testing.T) {
 					{
 						Meter:     meterName,
 						NaturalID: kindID,
-						Name:      pgtype.Text{String: "", Valid: true},
+						Name:      PgText(""),
 					},
 				},
 				Readings: []db.Reading{
@@ -505,20 +505,20 @@ func TestDBPostUsage(t *testing.T) {
 						TransactionID:      1,
 						AccountID:          2,
 						Direction:          -1,
-						AmountMicrocredits: pgtype.Int8{Int64: amountMicrocredits.Int64 * 3, Valid: true},
+						AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
 					},
 					{
 						TransactionID:      1,
 						AccountID:          4,
 						Direction:          1,
-						AmountMicrocredits: pgtype.Int8{Int64: amountMicrocredits.Int64 * 3, Valid: true},
+						AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
 					},
 				},
 				Transactions: []db.Transaction{
 					{
 						ID:          1,
 						OccurredAt:  periodEnd,
-						Description: pgtype.Text{String: "Monthly usage 2025-02-01--2025-03-01", Valid: true},
+						Description: PgText("Monthly usage 2025-02-01--2025-03-01"),
 						Type:        db.TransactionTypeUsagePost,
 						CustomerID:  pgtype.Int8{Int64: customer1ID, Valid: true},
 					},
@@ -533,11 +533,9 @@ func TestDBPostUsage(t *testing.T) {
 				CustomerIDs: map[string]int64{},
 				Customers: []db.Customer{
 					{
-						ID:   customer1ID,
 						Name: customer1Name,
 					},
 					{
-						ID:   customer2ID,
 						Name: customer2Name,
 					},
 				},
@@ -564,7 +562,7 @@ func TestDBPostUsage(t *testing.T) {
 					{
 						Meter:     meterName,
 						NaturalID: kindID,
-						Name:      pgtype.Text{String: "", Valid: true},
+						Name:      PgText(""),
 					},
 				},
 				Readings: []db.Reading{

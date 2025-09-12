@@ -47,3 +47,10 @@ func PgInt4(v int32) pgtype.Int4 {
 		Valid: true,
 	}
 }
+
+func PgText(v string) pgtype.Text {
+	return pgtype.Text{
+		String: v,
+		Valid:  true,
+	}
+}
