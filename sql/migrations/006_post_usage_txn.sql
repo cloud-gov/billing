@@ -7,11 +7,7 @@ CREATE OR REPLACE FUNCTION post_usage (
 	as_of timestamptz DEFAULT now()
 )
 RETURNS table(
-	customer_id bigint,
-	transaction_id integer,
-	account_id integer,
-	direction integer,
-	total_amount_microcredits bigint
+	transaction_id integer
 )
 LANGUAGE plpgsql
 AS $$
@@ -73,16 +69,9 @@ BEGIN
 		) AS ac(account_id, normal) ON TRUE
 		RETURNING e.transaction_id, e.account_id, e.direction, e.amount_microcredits
 	)
-	-- Step 4: Return all entries created by the function
-	SELECT
-		tx.customer_id,
-		e.transaction_id,
-		e.account_id,
-		e.direction,
-		e.amount_microcredits
-	FROM ins_tx AS tx
-	JOIN ins_entries AS e
-	ON tx.id = e.transaction_id;
+	-- Step 4: Return transaction IDs created by the function
+	SELECT DISTINCT e.transaction_id
+	FROM ins_entries AS e;
 END $$;
 
 COMMENT ON FUNCTION post_usage IS 'posts_usage returns all entries, plus their associated customer_id. This function must be run in a transaction.';

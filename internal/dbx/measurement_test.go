@@ -12,23 +12,32 @@ import (
 	"github.com/cloud-gov/billing/internal/testutil"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type CFOrg struct {
+	// CustomerName is a key we can use to look up the generated ID in testData.CustomerIDs.
+	CustomerName string
+	db.CFOrg
+}
+
 // testData is used to populate the database with rows required to perform a test.
 type testData struct {
-	Accounts     []db.Account
-	Customers    []db.Customer
-	Entries      []db.Entry
-	Kinds        []db.ResourceKind
-	Measurements []db.Measurement
-	Meters       []db.Meter
-	Orgs         []db.CFOrg
-	Prices       []db.Price
-	Readings     []db.Reading
-	Resources    []db.Resource
-	Transactions []db.Transaction
+	Accounts []db.Account
+	CFOrgs   []CFOrg
+	// CustomerIDs maps from customer names (known in advance) to customer ID (returned by INSERT).
+	CustomerIDs   map[string]int64
+	Customers     []db.Customer
+	Entries       []db.Entry
+	Measurements  []db.Measurement
+	Meters        []db.Meter
+	Prices        []db.Price
+	Readings      []db.Reading
+	ResourceKinds []db.ResourceKind
+	Resources     []db.Resource
+	Transactions  []db.Transaction
 }
 
 func TestDBBoundsMonthPrev(t *testing.T) {
@@ -108,7 +117,7 @@ func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
 		})
 	} else {
 		t.Cleanup(func() {
-			tx.Rollback(ctx)
+			err = tx.Rollback(ctx)
 			// Ignore error if the transaction was already committed
 			if err != nil && !errors.Is(pgx.ErrTxClosed, err) {
 				t.Fatal("failed to rollback transaction: ", err)
@@ -147,9 +156,11 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 	)
 
 	td := testData{
-		Orgs: []db.CFOrg{
+		CFOrgs: []CFOrg{
 			{
-				ID: orgID,
+				CFOrg: db.CFOrg{
+					ID: orgID,
+				},
 			},
 		},
 		Meters: []db.Meter{
@@ -157,7 +168,7 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 				Name: meterName,
 			},
 		},
-		Kinds: []db.ResourceKind{
+		ResourceKinds: []db.ResourceKind{
 			{
 				Meter:     meterName,
 				NaturalID: kindID,
@@ -325,13 +336,17 @@ func measurementFromReadingID(m []db.Measurement, id int32) int {
 		return e.ReadingID == id
 	})
 }
-
 func TestDBPostUsage(t *testing.T) {
 	_, _ = time.LoadLocation("America/New_York")
 
 	var (
-		customerID         = int64(1)
-		orgID              = testutil.NewPgxUUID()
+		customer1ID        = int64(1)
+		customer2ID        = int64(2)
+		customer1Name      = "customer1"
+		customer2Name      = "customer2"
+		org1ID             = testutil.NewPgxUUID()
+		org2ID             = testutil.NewPgxUUID()
+		org3ID             = testutil.NewPgxUUID()
 		meterName          = "meter-1"
 		kindID             = "kind-1"
 		readingID1         = int32(1)
@@ -340,8 +355,9 @@ func TestDBPostUsage(t *testing.T) {
 		readingID4         = int32(4)
 		readingID5         = int32(5)
 		readingID6         = int32(6)
-		resourceID         = "resource-1"
-		amountMicrocredits = pgtype.Int8{Int64: 56, Valid: true}
+		resource1ID        = "resource-1"
+		resource2ID        = "resource-2"
+		amountMicrocredits = pgInt8(56)
 		tz, _              = time.LoadLocation("America/New_York")
 		utc, _             = time.LoadLocation("")
 		asOf               = testutil.NewPgxTimestamptz(time.Date(2025, time.March, 1, 0, 0, 0, 0, tz))
@@ -353,20 +369,25 @@ func TestDBPostUsage(t *testing.T) {
 		AsOf   pgtype.Timestamptz
 		Before testData
 		After  testData
+		Return int // Number of records returned.
 	}{
 		{
-			Name: "",
+			Name: "boundary test: 1 customer, multiple readings over time",
 			AsOf: asOf,
 			Before: testData{
+				CustomerIDs: map[string]int64{},
 				Customers: []db.Customer{
 					{
-						ID: customerID,
+						ID:   customer1ID,
+						Name: customer1Name,
 					},
 				},
-				Orgs: []db.CFOrg{
+				CFOrgs: []CFOrg{
 					{
-						ID:         orgID,
-						CustomerID: pgtype.Int8{Int64: customerID, Valid: true},
+						CustomerName: customer1Name,
+						CFOrg: db.CFOrg{
+							ID: org1ID,
+						},
 					},
 				},
 				Meters: []db.Meter{
@@ -374,7 +395,7 @@ func TestDBPostUsage(t *testing.T) {
 						Name: meterName,
 					},
 				},
-				Kinds: []db.ResourceKind{
+				ResourceKinds: []db.ResourceKind{
 					{
 						Meter:     meterName,
 						NaturalID: kindID,
@@ -416,50 +437,50 @@ func TestDBPostUsage(t *testing.T) {
 				Resources: []db.Resource{
 					{
 						Meter:         meterName,
-						NaturalID:     resourceID,
+						NaturalID:     resource1ID,
 						KindNaturalID: kindID,
-						CFOrgID:       orgID,
+						CFOrgID:       org1ID,
 					},
 				},
 				Measurements: []db.Measurement{
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID1,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID2,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID3,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID4,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID5,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resourceID,
+						ResourceNaturalID:  resource1ID,
 						Value:              7,
 						ReadingID:          readingID6,
 						AmountMicrocredits: amountMicrocredits,
@@ -500,10 +521,154 @@ func TestDBPostUsage(t *testing.T) {
 						OccurredAt:  periodEnd,
 						Description: pgtype.Text{String: "Monthly usage 2025-02-01--2025-03-01", Valid: true},
 						Type:        db.TransactionTypeUsagePost,
-						CustomerID:  pgtype.Int8{Int64: customerID, Valid: true},
+						CustomerID:  pgtype.Int8{Int64: customer1ID, Valid: true},
 					},
 				},
 			},
+			Return: 1,
+		},
+		{
+			Name: "multiple customers with multiple readings in bounds",
+			AsOf: asOf,
+			Before: testData{
+				CustomerIDs: map[string]int64{},
+				Customers: []db.Customer{
+					{
+						ID:   customer1ID,
+						Name: customer1Name,
+					},
+					{
+						ID:   customer2ID,
+						Name: customer2Name,
+					},
+				},
+				CFOrgs: []CFOrg{
+					{
+						CustomerName: customer1Name,
+						CFOrg: db.CFOrg{
+							ID: org3ID,
+						},
+					},
+					{
+						CustomerName: customer2Name,
+						CFOrg: db.CFOrg{
+							ID: org2ID,
+						},
+					},
+				},
+				Meters: []db.Meter{
+					{
+						Name: meterName,
+					},
+				},
+				ResourceKinds: []db.ResourceKind{
+					{
+						Meter:     meterName,
+						NaturalID: kindID,
+						Name:      pgtype.Text{String: "", Valid: true},
+					},
+				},
+				Readings: []db.Reading{
+					{
+						ID:        readingID1,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
+						// Correct first day of bounds, but before start of day ET
+					},
+					{
+						ID:        readingID2,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
+						// Correct first day of bounds, and at start of day ET, inclusive
+					},
+					{
+						ID:        readingID3,
+						CreatedAt: testutil.NewPgxTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
+						// Next month in UTC, still previous day in ET
+					},
+				},
+				Resources: []db.Resource{
+					{
+						Meter:         meterName,
+						NaturalID:     resource1ID,
+						KindNaturalID: kindID,
+						CFOrgID:       org3ID,
+					},
+					{
+						Meter:         meterName,
+						NaturalID:     resource2ID,
+						KindNaturalID: kindID,
+						CFOrgID:       org2ID,
+					},
+				},
+				Measurements: []db.Measurement{
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource1ID,
+						Value:              2,
+						ReadingID:          readingID1,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource1ID,
+						Value:              2,
+						ReadingID:          readingID1,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource1ID,
+						Value:              2,
+						ReadingID:          readingID2,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource2ID,
+						Value:              2,
+						ReadingID:          readingID2,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource2ID,
+						Value:              2,
+						ReadingID:          readingID3,
+						AmountMicrocredits: amountMicrocredits,
+					},
+					{
+						Meter:              meterName,
+						ResourceNaturalID:  resource2ID,
+						Value:              2,
+						ReadingID:          readingID3,
+						AmountMicrocredits: amountMicrocredits,
+					},
+				},
+			},
+			After: testData{
+				Accounts: []db.Account{
+					{
+						ID:         2,
+						CustomerID: 1,
+						Type:       201,
+					},
+					{
+						ID:         4,
+						CustomerID: 1,
+						Type:       401,
+					},
+					{
+						ID:         6,
+						CustomerID: 2,
+						Type:       201,
+					},
+					{
+						ID:         8,
+						CustomerID: 2,
+						Type:       401,
+					},
+				},
+			},
+			Return: 2,
 		},
 	}
 
@@ -514,7 +679,7 @@ func TestDBPostUsage(t *testing.T) {
 			if err != nil {
 				t.Fatal("creating database connection failed", err)
 			}
-			q := newTx(t, conn, true)
+			q := newTx(t, conn, false)
 
 			createTestData(t, q, tc.Before)
 
@@ -525,13 +690,12 @@ func TestDBPostUsage(t *testing.T) {
 			}
 
 			// Assert
-			if len(results) != 2 {
-				t.Fatalf("expected 2 rows returned, got %v", len(results))
-			}
-			if total := results[0].TotalAmountMicrocredits.Int64; total != 3*56 {
-				t.Fatalf("expected total %v, got %v", 3*56, total)
-			}
 			assertDBContains(t, q, tc.After)
+
+			if len(results) != tc.Return {
+				t.Logf("expected %v rows returned, got %v", tc.Return, len(results))
+				t.Fail()
+			}
 		})
 	}
 }
@@ -540,62 +704,70 @@ func TestDBPostUsage(t *testing.T) {
 func createTestData(t *testing.T, q db.Querier, td testData) {
 	t.Helper()
 	// Order of creation depends on fkey dependencies.
-	for _, i := range td.Customers {
-		_, err := q.CreateCustomer(t.Context(), i.Name)
+	for _, v := range td.Customers {
+		id, err := q.CreateCustomer(t.Context(), v.Name)
 		if err != nil {
-			t.Fatal("creating customer failed", err)
+			t.Fatal("creating customer failed:", err)
+		}
+		td.CustomerIDs[v.Name] = id
+	}
+	for _, v := range td.CFOrgs {
+		if v.CustomerName != "" {
+			customerID, ok := td.CustomerIDs[v.CustomerName]
+			if !ok {
+				t.Fatal("creating CFOrg: could not look up customer ID by name in CustomerIDs map (did you declare it in testData and include a name?)")
+			}
+			v.CFOrg.CustomerID = pgInt8(customerID)
+		}
+		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(v.CFOrg))
+		if err != nil {
+			t.Fatalf("creating CF org failed: %T %v", err, err)
 		}
 	}
-	for _, i := range td.Orgs {
-		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(i))
+	for _, v := range td.Meters {
+		_, err := q.CreateMeter(t.Context(), v.Name)
 		if err != nil {
-			t.Fatal("creating CF org failed", err)
+			t.Fatal("creating meter failed:", err)
 		}
 	}
-	for _, i := range td.Meters {
-		_, err := q.CreateMeter(t.Context(), i.Name)
-		if err != nil {
-			t.Fatal("creating meter failed", err)
-		}
-	}
-	for _, i := range td.Kinds {
+	for _, v := range td.ResourceKinds {
 		_, err := q.CreateResourceKind(t.Context(), db.CreateResourceKindParams{
-			Meter:     i.Meter,
-			NaturalID: i.NaturalID,
+			Meter:     v.Meter,
+			NaturalID: v.NaturalID,
 		})
 		if err != nil {
-			t.Fatal("creating resource kind failed", err)
+			t.Fatal("creating resource kind failed:", err)
 		}
 	}
-	for _, i := range td.Prices {
-		_, err := q.CreatePriceWithID(t.Context(), db.CreatePriceWithIDParams(i))
+	for _, v := range td.Prices {
+		_, err := q.CreatePriceWithID(t.Context(), db.CreatePriceWithIDParams(v))
 		if err != nil {
-			t.Fatal("creating price failed", err)
+			t.Fatal("creating price failed:", err)
 		}
 	}
-	for _, i := range td.Readings {
+	for _, v := range td.Readings {
 		_, err := q.CreateReadingWithID(t.Context(), db.CreateReadingWithIDParams{
-			ID:        i.ID,
-			CreatedAt: i.CreatedAt,
-			Periodic:  i.Periodic,
+			ID:        v.ID,
+			CreatedAt: v.CreatedAt,
+			Periodic:  v.Periodic,
 		})
 		if err != nil {
-			t.Fatal("creating reading failed", err)
+			t.Fatal("creating reading failed:", err)
 		}
 	}
-	for _, i := range td.Resources {
-		err := q.CreateResources(t.Context(), db.CreateResourcesParams(i))
+	for _, v := range td.Resources {
+		err := q.CreateResources(t.Context(), db.CreateResourcesParams(v))
 		if err != nil {
-			t.Fatal("creating resource failed", err)
+			t.Fatal("creating resource failed:", err)
 		}
 	}
-	for _, i := range td.Measurements {
+	for _, v := range td.Measurements {
 		q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
-			ReadingID:          i.ReadingID,
-			Meter:              i.Meter,
-			ResourceNaturalID:  i.ResourceNaturalID,
-			Value:              i.Value,
-			AmountMicrocredits: i.AmountMicrocredits,
+			ReadingID:          v.ReadingID,
+			Meter:              v.Meter,
+			ResourceNaturalID:  v.ResourceNaturalID,
+			Value:              v.Value,
+			AmountMicrocredits: v.AmountMicrocredits,
 		})
 	}
 }
@@ -614,7 +786,7 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			t.Fail()
 		}
 	}
-	for _, want := range td.Kinds {
+	for _, want := range td.ResourceKinds {
 		have, err := q.GetResourceKind(t.Context(), db.GetResourceKindParams{
 			Meter:     want.Meter,
 			NaturalID: want.NaturalID,
@@ -627,7 +799,7 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			t.Fail()
 		}
 	}
-	for _, want := range td.Orgs {
+	for _, want := range td.CFOrgs {
 		have, err := q.GetCFOrg(t.Context(), want.ID)
 		if err != nil {
 			t.Fatal("getting CFOrg", err)
@@ -659,5 +831,19 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			t.Logf("expected Entry %v, got %v", want, have)
 			t.Fail()
 		}
+	}
+}
+
+func pgInt8(v int64) pgtype.Int8 {
+	return pgtype.Int8{
+		Int64: v,
+		Valid: true,
+	}
+}
+
+func pgInt4(v int32) pgtype.Int4 {
+	return pgtype.Int4{
+		Int32: v,
+		Valid: true,
 	}
 }

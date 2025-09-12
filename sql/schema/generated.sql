@@ -68,7 +68,6 @@ CREATE FUNCTION public.post_usage(as_of timestamp with time zone DEFAULT now()) 
 DECLARE
 	ps timestamptz;
 	pe timestamptz;
-	updated bigint;
 BEGIN
 	SELECT period_start, period_end INTO ps, pe FROM bounds_month_prev(as_of);
 
@@ -88,6 +87,38 @@ BEGIN
 		AND rd.created_at_utc < pe
 		AND m.amount_microcredits IS NOT NULL
 		GROUP BY c.id
+	),
+	ins_tx AS (
+		INSERT INTO transaction(customer_id, occurred_at, description, type)
+		SELECT
+			mt.customer_id,
+			pe,
+			format('Monthly usage %s-%s', to_char(ps, 'YYYY-MM-DD'), to_char(pe, 'YYYY-MM-DD')),
+			'usage_post'
+		FROM measurement_totals AS mt
+		WHERE mt.total_amount_microcredits <> 0
+		RETURNING id, customer_id
+	),
+	ins_entries AS (
+		INSERT INTO entry(transaction_id, account_id, direction, amount_microcredits)
+		SELECT
+			it.id,
+			e.account_id,
+			e.normal,
+			mt.total_amount_microcredits
+		FROM ins_tx AS it
+		JOIN measurement_totals AS mt
+		ON it.customer_id = mt.customer_id
+		JOIN LATERAL (
+			SELECT a.id, a.normal
+			FROM account AS a
+			JOIN account_type AS at
+			ON a.id = at.id
+			WHERE a.customer_id = it.customer_id
+			AND (a.name = 'credit_pool' OR a.name = 'credits_used')
+			LIMIT 2
+		) AS e(account_id, normal) ON TRUE
+		RETURNING transaction_id
 	)
 	SELECT mt.customer_id::bigint, mt.total_amount_microcredits::bigint FROM measurement_totals mt;
 END $$;
@@ -310,7 +341,8 @@ CREATE TABLE public.transaction (
     id integer NOT NULL,
     occurred_at timestamp with time zone,
     description text,
-    type public.transaction_type NOT NULL
+    type public.transaction_type NOT NULL,
+    customer_id bigint
 );
 
 CREATE SEQUENCE public.transaction_id_seq

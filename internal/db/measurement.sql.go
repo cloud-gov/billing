@@ -143,37 +143,23 @@ func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
 }
 
 const postUsage = `-- name: PostUsage :many
-SELECT customer_id, transaction_id, account_id, direction, total_amount_microcredits
+SELECT transaction_id
 FROM post_usage($1)
 `
 
-type PostUsageRow struct {
-	CustomerID              pgtype.Int8
-	TransactionID           pgtype.Int4
-	AccountID               pgtype.Int4
-	Direction               pgtype.Int4
-	TotalAmountMicrocredits pgtype.Int8
-}
-
-func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]PostUsageRow, error) {
+func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error) {
 	rows, err := q.db.Query(ctx, postUsage, asOf)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []PostUsageRow
+	var items []pgtype.Int4
 	for rows.Next() {
-		var i PostUsageRow
-		if err := rows.Scan(
-			&i.CustomerID,
-			&i.TransactionID,
-			&i.AccountID,
-			&i.Direction,
-			&i.TotalAmountMicrocredits,
-		); err != nil {
+		var transaction_id pgtype.Int4
+		if err := rows.Scan(&transaction_id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, transaction_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

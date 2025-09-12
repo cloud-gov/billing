@@ -177,7 +177,7 @@ func (s *stubQuerier) ListTransactions(_ context.Context) ([]db.Transaction, err
 func (s *stubQuerier) ListTransactionsWide(_ context.Context) ([]db.ListTransactionsWideRow, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) PostUsage(_ context.Context, asOf pgtype.Timestamptz) ([]db.PostUsageRow, error) {
+func (s *stubQuerier) PostUsage(_ context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) SumEntries(_ context.Context) ([]pgtype.Numeric, error) {

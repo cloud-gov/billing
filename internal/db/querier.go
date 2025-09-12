@@ -63,7 +63,7 @@ type Querier interface {
 	ListTiers(ctx context.Context) ([]Tier, error)
 	ListTransactions(ctx context.Context) ([]Transaction, error)
 	ListTransactionsWide(ctx context.Context) ([]ListTransactionsWideRow, error)
-	PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]PostUsageRow, error)
+	PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error)
 	// SumEntries calculates the sum of all entries in the ledger. If the result is not 0, a transaction is imbalanced.
 	SumEntries(ctx context.Context) ([]pgtype.Numeric, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
