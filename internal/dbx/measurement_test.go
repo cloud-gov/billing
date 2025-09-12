@@ -22,6 +22,11 @@ type CFOrg struct {
 	db.CFOrg
 }
 
+type Transaction struct {
+	CustomerName string
+	db.Transaction
+}
+
 // testData is used to populate the database with rows required to perform a test.
 type testData struct {
 	Accounts []db.Account
@@ -36,7 +41,7 @@ type testData struct {
 	Readings      []db.Reading
 	ResourceKinds []db.ResourceKind
 	Resources     []db.Resource
-	Transactions  []db.Transaction
+	Transactions  []Transaction
 }
 
 func TestDBBoundsMonthPrev(t *testing.T) {
@@ -341,7 +346,6 @@ func TestDBPostUsage(t *testing.T) {
 	_, _ = time.LoadLocation("America/New_York")
 
 	var (
-		customer1ID        = int64(1)
 		customer1Name      = "customer1"
 		customer2Name      = "customer2"
 		org1ID             = PgUUID()
@@ -514,13 +518,14 @@ func TestDBPostUsage(t *testing.T) {
 						AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
 					},
 				},
-				Transactions: []db.Transaction{
+				Transactions: []Transaction{
 					{
-						ID:          1,
-						OccurredAt:  periodEnd,
-						Description: PgText("Monthly usage 2025-02-01--2025-03-01"),
-						Type:        db.TransactionTypeUsagePost,
-						CustomerID:  pgtype.Int8{Int64: customer1ID, Valid: true},
+						CustomerName: customer1Name,
+						Transaction: db.Transaction{
+							OccurredAt:  periodEnd,
+							Description: PgText("Monthly usage 2025-02-01--2025-03-01"),
+							Type:        db.TransactionTypeUsagePost,
+						},
 					},
 				},
 			},
@@ -679,7 +684,7 @@ func TestDBPostUsage(t *testing.T) {
 			q := newTx(t, conn, false)
 
 			createTestData(t, q, tc.Before)
-
+			copyTestDataIDs(&tc.Before, &tc.After)
 			// Act
 			results, err := q.PostUsage(t.Context(), tc.AsOf)
 			if err != nil {
@@ -695,6 +700,10 @@ func TestDBPostUsage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func copyTestDataIDs(before, after *testData) {
+	after.CustomerIDs = before.CustomerIDs
 }
 
 // createTestData creates a row for each struct in the provided data. It uses the Create methods from q, which may have additional effects.
@@ -806,13 +815,27 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			t.Fail()
 		}
 	}
+	// We don't know which transaction IDs are associated with which customers, so use list instead of getting by ID.
+	txns, err := q.ListTransactions(t.Context())
+	if err != nil {
+		t.Fatal("listing transactions: ", err)
+	}
 	for _, want := range td.Transactions {
-		have, err := q.GetTransaction(t.Context(), want.ID)
-		if err != nil {
-			t.Fatal("getting transaction", err)
-		}
-		if !cmp.Equal(want, have) {
-			t.Logf("expected Transaction %v, got %v", want, have)
+		// Check if a transaction exists that matches every field, besides ID, which we do not know ahead of time.
+		have := slices.IndexFunc(txns, func(have db.Transaction) bool {
+			// Create a db.Transaction for easy comparison
+			custID, ok := td.CustomerIDs[want.CustomerName]
+			if !ok {
+				t.Fatalf("could not find customer ID for name %v", want.CustomerName)
+			}
+			want.Transaction.CustomerID = PgInt8(custID)
+			return cmp.Equal(want.Transaction, have, cmp.Comparer(func(x, y int32) bool {
+				// IDs are the only int32 field we're comparing; always return true
+				return true
+			}))
+		})
+		if have == -1 {
+			t.Logf("expected Transaction %v, not found amongst: %v", want.Transaction, txns)
 			t.Fail()
 		}
 	}

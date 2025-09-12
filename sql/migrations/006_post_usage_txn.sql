@@ -3,6 +3,8 @@ ADD COLUMN customer_id bigint,
 ALTER COLUMN occurred_at TYPE timestamptz
 USING occurred_at AT TIME ZONE 'UTC';
 
+COMMENT ON COLUMN transaction.customer_id IS 'CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.';
+
 CREATE OR REPLACE FUNCTION post_usage (
 	as_of timestamptz DEFAULT now()
 )
