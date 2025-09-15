@@ -141,6 +141,12 @@ func (s *stubQuerier) GetCFOrg(_ context.Context, id pgtype.UUID) (db.CFOrg, err
 func (s *stubQuerier) GetCustomer(_ context.Context, id int64) (db.Customer, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) GetAccountForCustomerAndType(_ context.Context, arg db.GetAccountForCustomerAndTypeParams) (db.Account, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetEntriesForCustomerAndType(_ context.Context, arg db.GetEntriesForCustomerAndTypeParams) ([]db.Entry, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetEntry(_ context.Context, arg db.GetEntryParams) (db.Entry, error) {
 	panic("unimplemented")
 }

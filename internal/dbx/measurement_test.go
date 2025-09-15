@@ -2,6 +2,7 @@ package dbx_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"slices"
 	"testing"
@@ -16,10 +17,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type Account struct {
+	CustomerName string
+	AccountType  int32
+	db.Account
+}
+
 type CFOrg struct {
 	// CustomerName is a key we can use to look up the generated ID in testData.CustomerIDs.
 	CustomerName string
 	db.CFOrg
+}
+
+type Entry struct {
+	CustomerName string
+	AccountType  int32
+	db.Entry
 }
 
 type Transaction struct {
@@ -29,12 +42,12 @@ type Transaction struct {
 
 // testData is used to populate the database with rows required to perform a test.
 type testData struct {
-	Accounts []db.Account
+	Accounts []Account
 	CFOrgs   []CFOrg
 	// CustomerIDs maps from customer names (known in advance) to customer ID (returned by INSERT).
 	CustomerIDs   map[string]int64
 	Customers     []db.Customer
-	Entries       []db.Entry
+	Entries       []Entry
 	Measurements  []db.Measurement
 	Meters        []db.Meter
 	Prices        []db.Price
@@ -350,7 +363,6 @@ func TestDBPostUsage(t *testing.T) {
 		customer2Name      = "customer2"
 		org1ID             = PgUUID()
 		org2ID             = PgUUID()
-		org3ID             = PgUUID()
 		meterName          = "meter-1"
 		kindID             = "kind-1"
 		readingID1         = int32(1)
@@ -492,30 +504,34 @@ func TestDBPostUsage(t *testing.T) {
 			},
 			After: testData{
 				// Accounts are automatically created when the CF Org is created
-				Accounts: []db.Account{
+				Accounts: []Account{
 					{
-						ID:         2,
-						CustomerID: 1,
-						Type:       201,
+						CustomerName: customer1Name,
+						AccountType:  201,
+						Account:      db.Account{},
 					},
 					{
-						ID:         4,
-						CustomerID: 1,
-						Type:       401,
+						CustomerName: customer1Name,
+						AccountType:  401,
+						Account:      db.Account{},
 					},
 				},
-				Entries: []db.Entry{
+				Entries: []Entry{
 					{
-						TransactionID:      1,
-						AccountID:          2,
-						Direction:          -1,
-						AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
+						CustomerName: customer1Name,
+						AccountType:  201,
+						Entry: db.Entry{
+							Direction:          -1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
+						},
 					},
 					{
-						TransactionID:      1,
-						AccountID:          4,
-						Direction:          1,
-						AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
+						CustomerName: customer1Name,
+						AccountType:  401,
+						Entry: db.Entry{
+							Direction:          1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 3),
+						},
 					},
 				},
 				Transactions: []Transaction{
@@ -548,7 +564,7 @@ func TestDBPostUsage(t *testing.T) {
 					{
 						CustomerName: customer1Name,
 						CFOrg: db.CFOrg{
-							ID: org3ID,
+							ID: org1ID,
 						},
 					},
 					{
@@ -573,16 +589,11 @@ func TestDBPostUsage(t *testing.T) {
 				Readings: []db.Reading{
 					{
 						ID:        readingID1,
-						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 0, 0, 0, 0, utc)),
-						// Correct first day of bounds, but before start of day ET
-					},
-					{
-						ID:        readingID2,
 						CreatedAt: PgTimestamp(time.Date(2025, time.February, 1, 5, 0, 0, 0, utc)),
 						// Correct first day of bounds, and at start of day ET, inclusive
 					},
 					{
-						ID:        readingID3,
+						ID:        readingID2,
 						CreatedAt: PgTimestamp(time.Date(2025, time.March, 1, 0, 0, 0, 0, utc)),
 						// Next month in UTC, still previous day in ET
 					},
@@ -592,7 +603,7 @@ func TestDBPostUsage(t *testing.T) {
 						Meter:         meterName,
 						NaturalID:     resource1ID,
 						KindNaturalID: kindID,
-						CFOrgID:       org3ID,
+						CFOrgID:       org1ID,
 					},
 					{
 						Meter:         meterName,
@@ -605,68 +616,84 @@ func TestDBPostUsage(t *testing.T) {
 					{
 						Meter:              meterName,
 						ResourceNaturalID:  resource1ID,
-						Value:              2,
+						Value:              1,
 						ReadingID:          readingID1,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
 						ResourceNaturalID:  resource1ID,
-						Value:              2,
+						Value:              1,
 						ReadingID:          readingID1,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
-						ResourceNaturalID:  resource1ID,
-						Value:              2,
+						ResourceNaturalID:  resource2ID,
+						Value:              1,
 						ReadingID:          readingID2,
 						AmountMicrocredits: amountMicrocredits,
 					},
 					{
 						Meter:              meterName,
 						ResourceNaturalID:  resource2ID,
-						Value:              2,
+						Value:              1,
 						ReadingID:          readingID2,
-						AmountMicrocredits: amountMicrocredits,
-					},
-					{
-						Meter:              meterName,
-						ResourceNaturalID:  resource2ID,
-						Value:              2,
-						ReadingID:          readingID3,
-						AmountMicrocredits: amountMicrocredits,
-					},
-					{
-						Meter:              meterName,
-						ResourceNaturalID:  resource2ID,
-						Value:              2,
-						ReadingID:          readingID3,
 						AmountMicrocredits: amountMicrocredits,
 					},
 				},
 			},
 			After: testData{
-				Accounts: []db.Account{
+				Transactions: []Transaction{
 					{
-						ID:         2,
-						CustomerID: 1,
-						Type:       201,
+						CustomerName: customer1Name,
+						Transaction: db.Transaction{
+							OccurredAt:  periodEnd,
+							Description: PgText("Monthly usage 2025-02-01--2025-03-01"),
+							Type:        db.TransactionTypeUsagePost,
+						},
 					},
 					{
-						ID:         4,
-						CustomerID: 1,
-						Type:       401,
+						CustomerName: customer2Name,
+						Transaction: db.Transaction{
+							OccurredAt:  periodEnd,
+							Description: PgText("Monthly usage 2025-02-01--2025-03-01"),
+							Type:        db.TransactionTypeUsagePost,
+						},
+					},
+				},
+				Entries: []Entry{
+					{
+						CustomerName: customer1Name,
+						AccountType:  201,
+						Entry: db.Entry{
+							Direction:          -1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 2),
+						},
 					},
 					{
-						ID:         6,
-						CustomerID: 2,
-						Type:       201,
+						CustomerName: customer1Name,
+						AccountType:  401,
+						Entry: db.Entry{
+							Direction:          1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 2),
+						},
 					},
 					{
-						ID:         8,
-						CustomerID: 2,
-						Type:       401,
+						CustomerName: customer2Name,
+						AccountType:  201,
+						Entry: db.Entry{
+							Direction:          -1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 2),
+						},
+					},
+					{
+						CustomerName: customer2Name,
+						AccountType:  401,
+						Entry: db.Entry{
+							Direction:          1,
+							AmountMicrocredits: PgInt8(amountMicrocredits.Int64 * 2),
+						},
 					},
 				},
 			},
@@ -685,6 +712,7 @@ func TestDBPostUsage(t *testing.T) {
 
 			createTestData(t, q, tc.Before)
 			copyTestDataIDs(&tc.Before, &tc.After)
+
 			// Act
 			results, err := q.PostUsage(t.Context(), tc.AsOf)
 			if err != nil {
@@ -840,16 +868,33 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 		}
 	}
 	for _, want := range td.Entries {
-		have, err := q.GetEntry(t.Context(), db.GetEntryParams{
-			TransactionID: want.TransactionID,
-			AccountID:     want.AccountID,
+		have, err := q.GetEntriesForCustomerAndType(t.Context(), db.GetEntriesForCustomerAndTypeParams{
+			Name: want.CustomerName,
+			Type: want.AccountType,
 		})
 		if err != nil {
-			t.Fatal("getting entry", err)
+			t.Fatal("getting entries: ", err)
 		}
-		if !cmp.Equal(want, have) {
-			t.Logf("expected Entry %v, got %v", want, have)
+		idx := slices.IndexFunc(have, func(v db.Entry) bool {
+			return cmp.Equal(v.AmountMicrocredits, want.AmountMicrocredits) && cmp.Equal(v.Direction, want.Direction)
+		})
+		if idx == -1 {
+			t.Logf("expected Entry %v, not found amongst: %v", want.Entry, have)
 			t.Fail()
+		}
+	}
+	for _, want := range td.Accounts {
+		_, err := q.GetAccountForCustomerAndType(t.Context(), db.GetAccountForCustomerAndTypeParams{
+			Name: want.CustomerName,
+			Type: want.AccountType,
+		})
+		if err != nil {
+			// No other fields to compare for Accounts; it's either present or not
+			if errors.Is(err, sql.ErrNoRows) {
+				t.Logf("could not find Account like %v", want)
+				t.Fail()
+			}
+			t.Fatal("getting account: ", err)
 		}
 	}
 }

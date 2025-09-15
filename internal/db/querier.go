@@ -49,8 +49,10 @@ type Querier interface {
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
+	GetAccountForCustomerAndType(ctx context.Context, arg GetAccountForCustomerAndTypeParams) (Account, error)
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
+	GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error)
 	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
