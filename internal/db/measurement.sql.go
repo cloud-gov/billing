@@ -7,7 +7,27 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const boundsMonthPrev = `-- name: BoundsMonthPrev :one
+SELECT period_start, period_end
+FROM bounds_month_prev($1)
+`
+
+type BoundsMonthPrevRow struct {
+	PeriodStart pgtype.Timestamptz
+	PeriodEnd   pgtype.Timestamptz
+}
+
+// BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
+func (q *Queries) BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) (BoundsMonthPrevRow, error) {
+	row := q.db.QueryRow(ctx, boundsMonthPrev, asOf)
+	var i BoundsMonthPrevRow
+	err := row.Scan(&i.PeriodStart, &i.PeriodEnd)
+	return i, err
+}
 
 const bulkCreateMeasurement = `-- name: BulkCreateMeasurement :exec
 INSERT INTO measurement (
@@ -41,9 +61,93 @@ func (q *Queries) BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasu
 	return err
 }
 
+const createMeasurement = `-- name: CreateMeasurement :one
+INSERT INTO measurement (
+	reading_id,
+	meter,
+	resource_natural_id,
+	value
+) VALUES (
+	$1, $2, $3, $4
+) RETURNING reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
+`
+
+type CreateMeasurementParams struct {
+	ReadingID         int32
+	Meter             string
+	ResourceNaturalID string
+	Value             int32
+}
+
+func (q *Queries) CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error) {
+	row := q.db.QueryRow(ctx, createMeasurement,
+		arg.ReadingID,
+		arg.Meter,
+		arg.ResourceNaturalID,
+		arg.Value,
+	)
+	var i Measurement
+	err := row.Scan(
+		&i.ReadingID,
+		&i.Meter,
+		&i.ResourceNaturalID,
+		&i.Value,
+		&i.AmountMicrocredits,
+		&i.TransactionID,
+		&i.PriceID,
+	)
+	return i, err
+}
+
 type CreateMeasurementsParams struct {
 	ReadingID         int32
 	Meter             string
 	ResourceNaturalID string
 	Value             int32
+}
+
+const listMeasurements = `-- name: ListMeasurements :many
+SELECT reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
+FROM measurement
+`
+
+func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
+	rows, err := q.db.Query(ctx, listMeasurements)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Measurement
+	for rows.Next() {
+		var i Measurement
+		if err := rows.Scan(
+			&i.ReadingID,
+			&i.Meter,
+			&i.ResourceNaturalID,
+			&i.Value,
+			&i.AmountMicrocredits,
+			&i.TransactionID,
+			&i.PriceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateMeasurementMicrocredits = `-- name: UpdateMeasurementMicrocredits :one
+SELECT update_measurement_microcredits
+FROM update_measurement_microcredits($1)
+`
+
+// UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
+func (q *Queries) UpdateMeasurementMicrocredits(ctx context.Context, asOf pgtype.Timestamptz) (pgtype.Int8, error) {
+	row := q.db.QueryRow(ctx, updateMeasurementMicrocredits, asOf)
+	var update_measurement_microcredits pgtype.Int8
+	err := row.Scan(&update_measurement_microcredits)
+	return update_measurement_microcredits, err
 }

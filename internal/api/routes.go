@@ -16,23 +16,24 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/cloud-gov/billing/internal/api/middleware"
+	"github.com/cloud-gov/billing/internal/config"
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/jobs"
 )
 
 // Routes registers all customer-facing HTTP routes for the server.
-func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier) http.Handler {
+func Routes(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier, config config.Config) http.Handler {
 	mux := chi.NewMux()
 	mux.Use(httplog.RequestLogger(logger, &httplog.Options{
 		Level: slog.LevelInfo,
 	}))
 
-	mux.Mount("/admin", adminMux(logger, cf, q, riverc, verifier))
+	mux.Mount("/admin", adminMux(logger, cf, q, riverc, verifier, config))
 	return mux
 }
 
 // adminMux returns a Handler for admin routes with access restricted to authorized subjects.
-func adminMux(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier) http.Handler {
+func adminMux(logger *slog.Logger, cf *client.Client, q db.Querier, riverc *river.Client[pgx.Tx], verifier *oidc.IDTokenVerifier, config config.Config) http.Handler {
 	mux := chi.NewMux()
 
 	hasAdminScope := middleware.NewHasScope(logger, verifier, "usage.admin")
@@ -87,11 +88,15 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 		}
 
 		logger.Debug("api: creating reading")
-		reading, err := q.CreateReading(ctx, pgtype.Timestamp{Time: time.Now().UTC(), Valid: true})
+		reading, err := q.CreateUniqueReading(ctx, db.CreateUniqueReadingParams{
+			CreatedAt: pgtype.Timestamp{Time: time.Now().UTC(), Valid: true},
+			Periodic:  false,
+		})
 		if err != nil {
 			http.Error(w, "creating reading: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		logger.Debug("api: upserting resource")
 		resource, err := q.UpsertResource(ctx, db.UpsertResourceParams{
 			NaturalID:     app.GUID,
@@ -116,7 +121,7 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 			http.Error(w, "creating measurement: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		_, _ = io.WriteString(w, "Created measurement.\n")
+		_, _ = io.WriteString(w, "Created reading.\n")
 	})
 }
 

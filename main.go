@@ -22,7 +22,7 @@ import (
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/config"
 	"github.com/cloud-gov/billing/internal/db"
-	"github.com/cloud-gov/billing/internal/dbtx"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/jobs"
 	"github.com/cloud-gov/billing/internal/migrate"
 	"github.com/cloud-gov/billing/internal/server"
@@ -87,7 +87,7 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmtErr(ErrDBMigration, err)
 	}
 
-	q := dbtx.NewQuerier(db.New(conn))
+	q := dbx.NewQuerier(db.New(conn))
 
 	logger.Debug("run: initializing meters")
 	meters := []reader.Meter{
@@ -140,7 +140,7 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 
 	logger.Debug("run: starting web server")
-	srv := server.New(c.Host, c.Port, api.Routes(logger, cfclient, q, riverc, verifier), logger)
+	srv := server.New(c.Host, c.Port, api.Routes(logger, cfclient, q, riverc, verifier, c), logger)
 	srv.ListenAndServe(ctx)
 	return nil
 }

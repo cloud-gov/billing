@@ -7,8 +7,6 @@ package db
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const bulkCreateResourceKinds = `-- name: BulkCreateResourceKinds :exec
@@ -36,37 +34,22 @@ func (q *Queries) BulkCreateResourceKinds(ctx context.Context, arg BulkCreateRes
 
 const createResourceKind = `-- name: CreateResourceKind :one
 INSERT INTO resource_kind (
-  meter, natural_id, credits, amount, unit_of_measure
+  meter, natural_id
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2
 )
-RETURNING meter, natural_id, credits, amount, unit_of_measure
+RETURNING meter, natural_id, name
 `
 
 type CreateResourceKindParams struct {
-	Meter         string
-	NaturalID     string
-	Credits       pgtype.Int4
-	Amount        pgtype.Int4
-	UnitOfMeasure pgtype.Text
+	Meter     string
+	NaturalID string
 }
 
 func (q *Queries) CreateResourceKind(ctx context.Context, arg CreateResourceKindParams) (ResourceKind, error) {
-	row := q.db.QueryRow(ctx, createResourceKind,
-		arg.Meter,
-		arg.NaturalID,
-		arg.Credits,
-		arg.Amount,
-		arg.UnitOfMeasure,
-	)
+	row := q.db.QueryRow(ctx, createResourceKind, arg.Meter, arg.NaturalID)
 	var i ResourceKind
-	err := row.Scan(
-		&i.Meter,
-		&i.NaturalID,
-		&i.Credits,
-		&i.Amount,
-		&i.UnitOfMeasure,
-	)
+	err := row.Scan(&i.Meter, &i.NaturalID, &i.Name)
 	return i, err
 }
 
@@ -86,7 +69,7 @@ func (q *Queries) DeleteResourceKind(ctx context.Context, arg DeleteResourceKind
 }
 
 const getResourceKind = `-- name: GetResourceKind :one
-SELECT meter, natural_id, credits, amount, unit_of_measure FROM resource_kind
+SELECT meter, natural_id, name FROM resource_kind
 WHERE meter = $1 AND natural_id = $2 LIMIT 1
 `
 
@@ -98,18 +81,12 @@ type GetResourceKindParams struct {
 func (q *Queries) GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error) {
 	row := q.db.QueryRow(ctx, getResourceKind, arg.Meter, arg.NaturalID)
 	var i ResourceKind
-	err := row.Scan(
-		&i.Meter,
-		&i.NaturalID,
-		&i.Credits,
-		&i.Amount,
-		&i.UnitOfMeasure,
-	)
+	err := row.Scan(&i.Meter, &i.NaturalID, &i.Name)
 	return i, err
 }
 
 const listResourceKind = `-- name: ListResourceKind :many
-SELECT meter, natural_id, credits, amount, unit_of_measure FROM resource_kind
+SELECT meter, natural_id, name FROM resource_kind
 ORDER BY natural_id
 `
 
@@ -122,13 +99,7 @@ func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) 
 	var items []ResourceKind
 	for rows.Next() {
 		var i ResourceKind
-		if err := rows.Scan(
-			&i.Meter,
-			&i.NaturalID,
-			&i.Credits,
-			&i.Amount,
-			&i.UnitOfMeasure,
-		); err != nil {
+		if err := rows.Scan(&i.Meter, &i.NaturalID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -137,31 +108,4 @@ func (q *Queries) ListResourceKind(ctx context.Context) ([]ResourceKind, error) 
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateResourceKind = `-- name: UpdateResourceKind :exec
-UPDATE resource_kind
-  set credits = $3,
-  amount = $4,
-  unit_of_measure = $5
-  WHERE meter = $1 AND natural_id = $2
-`
-
-type UpdateResourceKindParams struct {
-	Meter         string
-	NaturalID     string
-	Credits       pgtype.Int4
-	Amount        pgtype.Int4
-	UnitOfMeasure pgtype.Text
-}
-
-func (q *Queries) UpdateResourceKind(ctx context.Context, arg UpdateResourceKindParams) error {
-	_, err := q.db.Exec(ctx, updateResourceKind,
-		arg.Meter,
-		arg.NaturalID,
-		arg.Credits,
-		arg.Amount,
-		arg.UnitOfMeasure,
-	)
-	return err
 }

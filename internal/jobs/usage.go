@@ -10,7 +10,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
-	"github.com/cloud-gov/billing/internal/dbtx"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 	"github.com/cloud-gov/billing/internal/usage/recorder"
 )
@@ -19,7 +19,7 @@ var (
 	logger  *slog.Logger
 	conn    *pgxpool.Pool
 	rdr     *reader.Reader
-	querier dbtx.Querier
+	querier dbx.Querier
 )
 
 type MeasureUsageArgs struct {
@@ -81,7 +81,7 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 }
 
 // NewMeasureUsageWorker stores dependencies required for job execution and returns a new worker.
-func NewMeasureUsageWorker(l *slog.Logger, c *pgxpool.Pool, q dbtx.Querier, r *reader.Reader) *MeasureUsageWorker {
+func NewMeasureUsageWorker(l *slog.Logger, c *pgxpool.Pool, q dbx.Querier, r *reader.Reader) *MeasureUsageWorker {
 	logger = l
 	conn = c
 	querier = q

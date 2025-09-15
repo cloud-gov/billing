@@ -1,3 +1,13 @@
+-- name: CreateMeasurement :one
+INSERT INTO measurement (
+	reading_id,
+	meter,
+	resource_natural_id,
+	value
+) VALUES (
+	$1, $2, $3, $4
+) RETURNING *;
+
 -- name: CreateMeasurements :copyfrom
 INSERT INTO measurement (
 	reading_id,
@@ -21,3 +31,17 @@ UNNEST (
 	sqlc.arg(resource_natural_id)::text[],
 	sqlc.arg(value)::int[]
 ) AS m(reading_id, meter, resource_natural_id, value);
+
+-- name: UpdateMeasurementMicrocredits :one
+-- UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
+SELECT *
+FROM update_measurement_microcredits($1);
+
+-- name: BoundsMonthPrev :one
+-- BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
+SELECT period_start, period_end
+FROM bounds_month_prev($1);
+
+-- name: ListMeasurements :many
+SELECT *
+FROM measurement;
