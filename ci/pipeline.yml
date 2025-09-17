@@ -25,6 +25,8 @@ jobs:
       - task: go-test-db
         privileged: true
         file: pull-request/ci/partials/go-test-db.yml
+        input_mapping:
+          src: pull-request
 
     on_failure:
       put: pull-request
