@@ -18,6 +18,7 @@ run:
     - bash
     - -ceux
     - |
+      exit 1
       cd /opt/concourse-ci/task/src
       cp docker.env.example docker.env
 
