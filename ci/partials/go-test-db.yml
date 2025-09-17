@@ -1,0 +1,28 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source:
+    aws_access_key_id: ((ecr_aws_key))
+    aws_secret_access_key: ((ecr_aws_secret))
+    repository: pages-dind-v25
+    aws_region: us-gov-west-1
+    tag: latest
+inputs:
+  - name: src
+  - name: postgres
+  - name: general-task
+run:
+  dir: /usr/local/bin
+  path: docker-entrypoint.sh
+  args:
+    - bash
+    - -ceux
+    - |
+      cd /opt/concourse-ci/task/src
+      cp docker.env.example docker.env
+
+      docker compose down --volumes test-db-ephemeral
+      docker compose up --detach --wait test-db-ephemeral
+
+      # Run the tests in the general-task image so the go toolchain and `source` are available.
+      docker run --rm "$(docker build --build-arg base_image=general-task -q .)" make test-db-ci
