@@ -19,12 +19,12 @@ jobs:
           path: pull-request
           status: pending
       - task: go-checks
-        file: pull-request/ci/partials/go-checks.yml
+        file: src/ci/partials/go-checks.yml
         input_mapping:
           src: pull-request
       - task: go-test-db
         privileged: true
-        file: pull-request/ci/partials/go-test-db.yml
+        file: src/ci/partials/go-test-db.yml
 
     on_failure:
       put: pull-request
