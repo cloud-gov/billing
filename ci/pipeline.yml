@@ -298,7 +298,7 @@ resources:
     source:
       aws_access_key_id: ((ecr_aws_key))
       aws_secret_access_key: ((ecr_aws_secret))
-      repository: pages-postgres-15
+      repository: pages-postgres-v15
       aws_region: us-gov-west-1
       tag: latest
 
