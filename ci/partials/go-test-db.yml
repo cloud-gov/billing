@@ -12,8 +12,7 @@ inputs:
   - name: postgres
   - name: general-task
 run:
-  dir: /usr/local/bin
-  path: docker-entrypoint.sh
+  path: /usr/local/bin/docker-entrypoint.sh
   args:
     - bash
     - -ceux
