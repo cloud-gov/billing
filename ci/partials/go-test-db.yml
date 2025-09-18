@@ -9,8 +9,6 @@ image_resource:
     tag: latest
 inputs:
   - name: src
-  # - name: postgres
-  - name: general-task
 run:
   dir: src
   path: ci/bin/entrypoint.sh
@@ -18,7 +16,6 @@ run:
     - bash
     - -ceux
     - |
-      exit 1
       cd /opt/concourse-ci/task/src
       cp docker.env.example docker.env
 
