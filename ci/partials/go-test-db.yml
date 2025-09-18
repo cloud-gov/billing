@@ -1,0 +1,20 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source:
+    aws_access_key_id: ((ecr_aws_key))
+    aws_secret_access_key: ((ecr_aws_secret))
+    repository: pages-dind-v25
+    aws_region: us-gov-west-1
+    tag: latest
+inputs:
+  - name: src
+run:
+  dir: src
+  path: ci/bin/entrypoint.sh
+  args:
+    - bash
+    - -ceux
+    - |
+      docker compose up --detach --wait test-db-ephemeral
+      docker compose run --rm go-test-db
