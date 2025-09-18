@@ -3,9 +3,10 @@ INSERT INTO measurement (
 	reading_id,
 	meter,
 	resource_natural_id,
-	value
+	value,
+	amount_microcredits
 ) VALUES (
-	$1, $2, $3, $4
+	$1, $2, $3, $4, $5
 ) RETURNING *;
 
 -- name: CreateMeasurements :copyfrom
@@ -45,3 +46,7 @@ FROM bounds_month_prev($1);
 -- name: ListMeasurements :many
 SELECT *
 FROM measurement;
+
+-- name: PostUsage :many
+SELECT transaction_id
+FROM post_usage($1);

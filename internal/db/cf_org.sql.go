@@ -25,13 +25,19 @@ func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
 }
 
 const createCFOrg = `-- name: CreateCFOrg :one
-INSERT INTO cf_org (id)
-VALUES ($1)
+INSERT INTO cf_org (id, name, customer_id)
+VALUES ($1, $2, $3)
 RETURNING id, name, customer_id
 `
 
-func (q *Queries) CreateCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
-	row := q.db.QueryRow(ctx, createCFOrg, id)
+type CreateCFOrgParams struct {
+	ID         pgtype.UUID
+	Name       pgtype.Text
+	CustomerID pgtype.Int8
+}
+
+func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
+	row := q.db.QueryRow(ctx, createCFOrg, arg.ID, arg.Name, arg.CustomerID)
 	var i CFOrg
 	err := row.Scan(&i.ID, &i.Name, &i.CustomerID)
 	return i, err

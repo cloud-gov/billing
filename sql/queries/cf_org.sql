@@ -1,6 +1,6 @@
 -- name: CreateCFOrg :one
-INSERT INTO cf_org (id)
-VALUES ($1)
+INSERT INTO cf_org (id, name, customer_id)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetCFOrg :one

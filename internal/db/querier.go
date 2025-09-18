@@ -29,7 +29,7 @@ type Querier interface {
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
-	CreateCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
+	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
 	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
 	CreateCustomer(ctx context.Context, name string) (int64, error)
 	CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error)
@@ -49,11 +49,14 @@ type Querier interface {
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
+	GetAccountForCustomerAndType(ctx context.Context, arg GetAccountForCustomerAndTypeParams) (Account, error)
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
+	GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error)
+	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
-	GetTransaction(ctx context.Context, id int32) ([]Transaction, error)
+	GetTransaction(ctx context.Context, id int32) (Transaction, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListMeasurements(ctx context.Context) ([]Measurement, error)
@@ -62,6 +65,7 @@ type Querier interface {
 	ListTiers(ctx context.Context) ([]Tier, error)
 	ListTransactions(ctx context.Context) ([]Transaction, error)
 	ListTransactionsWide(ctx context.Context) ([]ListTransactionsWideRow, error)
+	PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error)
 	// SumEntries calculates the sum of all entries in the ledger. If the result is not 0, a transaction is imbalanced.
 	SumEntries(ctx context.Context) ([]pgtype.Numeric, error)
 	UpdateCFOrg(ctx context.Context, arg UpdateCFOrgParams) error
