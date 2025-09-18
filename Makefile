@@ -1,3 +1,6 @@
+# Use bash so we can use `source`.
+SHELL := /bin/bash
+
 .PHONY: db-up
 db-up:
 	docker compose up --detach --wait
@@ -131,7 +134,6 @@ test-db:
 .PHONY: test-db-ci
 test-db-ci:
 	@# Assume the database is up, but not migrated.
-
 	@# Equivalent to `make db-init`, but for the ephemeral database
 	@set -a; source docker.env; PGDATABASE=postgres PGPORT=5433; set +a; \
 	go tool tern migrate --config sql/init/tern.conf --migrations sql/init

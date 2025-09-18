@@ -16,7 +16,6 @@ run:
     - bash
     - -ceux
     - |
-      pwd
       cp docker.env.example docker.env
 
       docker compose down --volumes test-db-ephemeral
