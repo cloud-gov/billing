@@ -16,10 +16,5 @@ run:
     - bash
     - -ceux
     - |
-      cp docker.env.example docker.env
-
-      docker compose down --volumes test-db-ephemeral
       docker compose up --detach --wait test-db-ephemeral
-
-      # Run the tests in the general-task image so the go toolchain and `source` are available.
-      docker run --rm "$(docker build --build-arg base_image=golang -q .)" make test-db-ci
+      docker compose run --rm go-test-db

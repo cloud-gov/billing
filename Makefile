@@ -3,11 +3,11 @@ SHELL := /bin/bash
 
 .PHONY: db-up
 db-up:
-	docker compose up --detach --wait
+	docker compose up --detach --wait db
 
 .PHONY: db-down
 db-down:
-	docker compose down
+	docker compose down db
 
 .PHONY: gen
 gen: db-up
@@ -135,21 +135,19 @@ test-db:
 test-db-ci:
 	@# Assume the database is up, but not migrated.
 	@# Equivalent to `make db-init`, but for the ephemeral database
-	@set -a; source docker.env; PGDATABASE=postgres PGPORT=5433; set +a; \
+	@# Intended to be run inside a container.
+	@PGDATABASE=postgres \
 	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool river migrate-up
+	@go tool river migrate-up
 
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go test ./... -run TestDB -count=1
+	@go test ./... -run TestDB -count=1
 
 .PHONY: jwt
 jwt:

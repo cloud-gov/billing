@@ -27,3 +27,18 @@ services:
           size: 134217728 # 128*2^20 bytes = 128Mb
     environment:
       POSTGRES_PASSWORD: postgres
+  go-test-db:
+    image: golang
+    depends_on:
+      test-db-ephemeral:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      PGHOST: test-db-ephemeral
+      PGPORT: "5433"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: billing
+    command: ["bash", "-lc", "make test-db-ci"]
