@@ -9,7 +9,7 @@ image_resource:
     tag: latest
 inputs:
   - name: src
-  # - name: postgres
+  - name: postgres
   # - name: general-task
 run:
   dir: src
