@@ -23,4 +23,4 @@ run:
       docker compose up --detach --wait test-db-ephemeral
 
       # Run the tests in the general-task image so the go toolchain and `source` are available.
-      docker run --rm "$(docker build --build-arg base_image=general-task -q .)" make test-db-ci
+      docker run --rm "$(docker build --build-arg base_image=golang -q .)" make test-db-ci
