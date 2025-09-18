@@ -9,8 +9,8 @@ image_resource:
     tag: latest
 inputs:
   - name: src
-  - name: postgres
-  # - name: general-task
+  # - name: postgres
+  - name: general-task
 run:
   dir: src
   path: ci/bin/entrypoint.sh
