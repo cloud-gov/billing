@@ -76,7 +76,7 @@ BEGIN
 	FROM ins_entries AS e;
 END $$;
 
-COMMENT ON FUNCTION post_usage IS 'posts_usage returns all entries, plus their associated customer_id. This function must be run in a transaction.';
+COMMENT ON FUNCTION post_usage IS 'post_usage returns all entries, plus their associated customer_id. This function must be run in a transaction.';
 
 CREATE OR REPLACE FUNCTION assert_transaction_balances()
 RETURNS TRIGGER
@@ -108,6 +108,35 @@ ALTER TABLE account
 ALTER COLUMN customer_id SET NOT NULL,
 ALTER COLUMN type SET NOT NULL;
 
+-- Indexes so post_usage is fast.
+-- Filter by month and join to measurements
+CREATE INDEX IF NOT EXISTS reading_created_at_utc_idx
+	ON reading (created_at_utc);
+
+-- Join m -> rd
+CREATE INDEX IF NOT EXISTS measurement_reading_id_idx
+	ON measurement (reading_id);
+
+-- Join m -> r
+CREATE INDEX IF NOT EXISTS measurement_meter_resource_natural_idx
+	ON measurement (meter, resource_natural_id);
+
+-- Join r -> o
+CREATE INDEX IF NOT EXISTS resource_cf_org_id_idx
+	ON resource (cf_org_id);
+
+-- Join o -> c
+CREATE INDEX IF NOT EXISTS cf_org_customer_id_idx
+	ON cf_org (customer_id);
+
+-- LATERAL lookup of the two accounts for a customer
+CREATE INDEX IF NOT EXISTS account_customer_type_idx
+	ON account (customer_id, type);
+
+-- Resolve "credit_pool"/"credits_used" quickly
+CREATE UNIQUE INDEX IF NOT EXISTS account_type_name_uidx
+	ON account_type (name);
+
 ---- create above / drop below ----
 
 DROP FUNCTION IF EXISTS post_usage;
@@ -136,3 +165,11 @@ ALTER COLUMN direction DROP NOT NULL;
 ALTER TABLE account
 ALTER COLUMN customer_id DROP NOT NULL,
 ALTER COLUMN type DROP NOT NULL;
+
+DROP INDEX IF EXISTS reading_created_at_utc_idx;
+DROP INDEX IF EXISTS measurement_reading_id_idx;
+DROP INDEX IF EXISTS measurement_meter_resource_natural_idx;
+DROP INDEX IF EXISTS resource_cf_org_id_idx;
+DROP INDEX IF EXISTS cf_org_customer_id_idx;
+DROP INDEX IF EXISTS account_customer_type_idx;
+DROP INDEX IF EXISTS account_type_name_uidx;
