@@ -16,7 +16,7 @@ run:
     - bash
     - -ceux
     - |
-      cd /opt/concourse-ci/task/src
+      cd src
       cp docker.env.example docker.env
 
       docker compose down --volumes test-db-ephemeral
