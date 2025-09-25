@@ -13,7 +13,11 @@ jobs:
             version: every
             trigger: true
           - get: postgres
+            params:
+              format: oci
           - get: general-task
+            params:
+              format: oci
       - put: pull-request
         params:
           path: pull-request
