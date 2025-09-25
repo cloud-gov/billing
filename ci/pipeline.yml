@@ -23,7 +23,7 @@ jobs:
         input_mapping:
           src: pull-request
       - task: go-test-db
-        privileged: true
+        privileged: true # Required for docker-in-docker.
         file: pull-request/ci/partials/go-test-db.yml
         input_mapping:
           src: pull-request
