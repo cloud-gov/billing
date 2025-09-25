@@ -1,0 +1,29 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source:
+    aws_access_key_id: ((ecr_aws_key))
+    aws_secret_access_key: ((ecr_aws_secret))
+    repository: pages-dind-v25
+    aws_region: us-gov-west-1
+    tag: latest
+inputs:
+  - name: src
+  - name: general-task
+  - name: postgres
+run:
+  dir: src
+  path: ci/bin/entrypoint.sh
+  args:
+    - bash
+    - -ceux
+    - |
+      pushd ..
+        docker load -i general-task/image.tar
+        docker tag "$(cat general-task/repository):$(cat general-task/tag)" general-task:ci
+        docker load -i postgres/image.tar
+        docker tag "$(cat postgres/repository):$(cat postgres/tag)" postgres:ci
+      popd
+      docker network prune -f
+      docker compose -f ci/compose.yaml up --detach --wait test-db-ephemeral
+      docker compose -f ci/compose.yaml run --rm go-test-db
