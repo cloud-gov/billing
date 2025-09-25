@@ -131,23 +131,24 @@ test-db:
 	@set -a; source docker.env; PGPORT=5433; set +a; \
 	go test ./... -run TestDB -count=1
 
+# Run from inside a container.
+# Ephemeral database must already be up via docker compose.
 .PHONY: test-db-ci
 test-db-ci:
-	@# Assume the database is up, but not migrated.
 	@# Equivalent to `make db-init`, but for the ephemeral database
 	@# Intended to be run inside a container.
-	@PGDATABASE=postgres \
+	PGDATABASE=postgres \
 	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.
-	@go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@go tool river migrate-up
+	go tool river migrate-up
 
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
-	@go test ./... -run TestDB -count=1
+	go test ./... -run TestDB -count=1
 
 .PHONY: jwt
 jwt:

@@ -46,4 +46,5 @@ services:
       PGUSER: postgres
       PGPASSWORD: postgres
       PGDATABASE: billing
+      PGSSLMODE: disable
     command: ["make", "test-db-ci"]
