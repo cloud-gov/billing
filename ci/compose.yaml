@@ -26,7 +26,7 @@ services:
         condition: service_healthy
     working_dir: /app
     volumes:
-      - .:/app
+      - ../.:/app
     environment:
       PGHOST: test-db-ephemeral
       PGPORT: "5432" # internal to compose network
