@@ -46,6 +46,12 @@ The application uses service account credentials to authenticate to the Cloud Fo
 
 Note that table name `schema_version` is reserved by tern for tracking migration status.
 
+Connect to the database in a CF environment with [cf-service-connect](https://github.com/cloud-gov/cf-service-connect):
+
+```
+cf connect-to-service billing billing-db
+```
+
 ### Dependencies
 
 Why does this project use the packages that it does?
