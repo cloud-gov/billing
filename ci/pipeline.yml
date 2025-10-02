@@ -258,7 +258,7 @@ resources:
     source:
       commit_verification_keys: ((cloud-gov-pgp-keys))
       uri: https://github.com/cloud-gov/billing.git
-      branch: pr-workflow
+      branch: main
       paths:
         - ci/terraform/*
 
@@ -276,7 +276,7 @@ resources:
     source:
       commit_verification_keys: ((cloud-gov-pgp-keys))
       uri: https://github.com/cloud-gov/billing.git
-      branch: pr-workflow
+      branch: main
       paths:
         - ci/*
 
