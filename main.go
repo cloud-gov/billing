@@ -31,6 +31,11 @@ import (
 )
 
 var (
+	// BuildVersion is a commit SHA or branch ref. It is set during linking if provided and logged when the application starts.
+	BuildVersion string = "devel"
+)
+
+var (
 	ErrBadConfig        = errors.New("reading config from environment")
 	ErrCFClient         = errors.New("creating Cloud Foundry client")
 	ErrCFConfig         = errors.New("parsing Cloud Foundry connection configuration")
@@ -63,6 +68,7 @@ func run(ctx context.Context, out io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{
 		Level: c.LogLevel,
 	}))
+	logger.Info("build version: " + BuildVersion)
 	logger.Debug("run: initializing CF client")
 	cfconf, err := cfconfig.New(c.CFApiUrl,
 

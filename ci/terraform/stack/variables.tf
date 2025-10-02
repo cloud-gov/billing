@@ -35,3 +35,8 @@ variable "environment" {
   })
   sensitive = true
 }
+
+variable "short_ref" {
+  type        = string
+  description = "The git short ref of the current commit. E.g. a1b2c3d."
+}

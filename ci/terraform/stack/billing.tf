@@ -33,7 +33,9 @@ resource "cloudfoundry_app" "billing" {
 
   environment = merge(
     {
-      "GOVERSION" = "1.24"
+      "GO_LINKER_SYMBOL" = "main.BuildVersion"
+      "GO_LINKER_VALUE"  = var.short_ref
+      "GOVERSION"        = "1.24"
     },
     var.environment
   )
