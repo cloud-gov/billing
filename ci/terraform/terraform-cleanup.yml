@@ -2,8 +2,8 @@
 platform: linux
 
 inputs:
-  - name: src
+  - name: terraform-templates
   - name: terraform-state
 
 run:
-  path: src/ci/terraform/terraform-cleanup.sh
+  path: terraform-templates/ci/terraform/terraform-cleanup.sh
