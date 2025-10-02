@@ -1,21 +1,8 @@
-# For use with local development only.
+# For use in CI.
 # From postgres Docker README: https://github.com/docker-library/docs/blob/master/postgres/README.md#-via-docker-compose
 services:
-  db:
-    image: postgres:15
-    restart: always
-    shm_size: 128mb
-    ports:
-      - 5432:5432
-    volumes:
-      - type: tmpfs
-        target: /dev/shm
-        tmpfs:
-          size: 134217728 # 128*2^20 bytes = 128Mb
-    environment:
-      POSTGRES_PASSWORD: postgres
   test-db-ephemeral:
-    image: postgres:15
+    image: postgres:ci
     restart: always
     shm_size: 128mb
     ports:
@@ -32,3 +19,19 @@ services:
       interval: 2s
       timeout: 2s
       retries: 30
+  go-test-db:
+    image: general-task:ci
+    depends_on:
+      test-db-ephemeral:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ../.:/app
+    environment:
+      PGHOST: test-db-ephemeral
+      PGPORT: "5432" # internal to compose network
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: billing
+      PGSSLMODE: disable
+    command: ["make", "test-db-ci"]

@@ -6,6 +6,43 @@ jobs:
       - set_pipeline: self
         file: src/ci/pipeline.yml
 
+  - name: pull-request
+    plan:
+      - in_parallel:
+          - get: pull-request
+            version: every
+            trigger: true
+          - get: postgres
+            params:
+              format: oci
+          - get: general-task
+            params:
+              format: oci
+      - put: pull-request
+        params:
+          path: pull-request
+          status: pending
+      - task: go-checks
+        file: pull-request/ci/partials/go-checks.yml
+        input_mapping:
+          src: pull-request
+      - task: go-test-db
+        privileged: true # Required for docker-in-docker.
+        file: pull-request/ci/partials/go-test-db.yml
+        input_mapping:
+          src: pull-request
+
+    on_failure:
+      put: pull-request
+      params:
+        path: pull-request
+        status: failure
+    on_success:
+      put: pull-request
+      params:
+        path: pull-request
+        status: success
+
   - name: terraform-plan-billing-development
     plan:
       - in_parallel:
@@ -219,6 +256,23 @@ resources:
       # Terraform requires the cache directory to exist, even if empty.
       initial_content_binary: H4sIAHqo3GcAAyvIKU3PzNNNTkzOSNVnoA0wMDAwNzVVANNmENrAyARCQ4GCoYm5mbmhkYmhibGCgaGpqYkJg4IpjdyDAkqLSxKLgE7JSsxNLS7JyE/OSExJzcFUB1SWlobHHKg/4PQoGAWjYBQMcgAA4m+yIwAGAAA=
 
+  - name: pull-request
+    type: pull-request
+    check_every: 1m
+    source:
+      repository: cloud-gov/billing
+      access_token: ((cg-ci-bot-ghtoken))
+      disable_forks: true
+
+  - name: postgres
+    type: registry-image
+    source:
+      aws_access_key_id: ((ecr_aws_key))
+      aws_secret_access_key: ((ecr_aws_secret))
+      repository: pages-postgres-v15
+      aws_region: us-gov-west-1
+      tag: latest
+
 resource_types:
   - name: registry-image
     type: registry-image
@@ -244,5 +298,14 @@ resource_types:
       aws_access_key_id: ((ecr_aws_key))
       aws_secret_access_key: ((ecr_aws_secret))
       repository: s3-resource
+      aws_region: us-gov-west-1
+      tag: latest
+
+  - name: pull-request
+    type: registry-image
+    source:
+      aws_access_key_id: ((ecr_aws_key))
+      aws_secret_access_key: ((ecr_aws_secret))
+      repository: github-pr-resource
       aws_region: us-gov-west-1
       tag: latest
