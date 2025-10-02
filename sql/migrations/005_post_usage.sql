@@ -125,7 +125,7 @@ END $$;
 
 ---- create above / drop below ----
 ALTER TABLE reading
-ALTER COLUMN created_at TYPE timestamp;
+DROP COLUMN created_at_utc;
 
 ALTER TABLE entry
 ADD COLUMN amount NUMERIC(20,4) NOT NULL;

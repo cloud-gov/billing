@@ -87,7 +87,7 @@ func (s *stubQuerier) BulkCreateMeasurement(_ context.Context, arg db.BulkCreate
 func (s *stubQuerier) AccountingEquation(_ context.Context) ([]string, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CreateCFOrg(_ context.Context, arg pgtype.UUID) (db.CFOrg, error) {
+func (s *stubQuerier) CreateCFOrg(_ context.Context, arg db.CreateCFOrgParams) (db.CFOrg, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) CreateCustomer(_ context.Context, arg string) (int64, error) {
@@ -141,13 +141,22 @@ func (s *stubQuerier) GetCFOrg(_ context.Context, id pgtype.UUID) (db.CFOrg, err
 func (s *stubQuerier) GetCustomer(_ context.Context, id int64) (db.Customer, error) {
 	panic("unimplemented")
 }
+func (s *stubQuerier) GetAccountForCustomerAndType(_ context.Context, arg db.GetAccountForCustomerAndTypeParams) (db.Account, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetEntriesForCustomerAndType(_ context.Context, arg db.GetEntriesForCustomerAndTypeParams) ([]db.Entry, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) GetEntry(_ context.Context, arg db.GetEntryParams) (db.Entry, error) {
+	panic("unimplemented")
+}
 func (s *stubQuerier) GetResourceKind(_ context.Context, arg db.GetResourceKindParams) (db.ResourceKind, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetTier(_ context.Context, id int32) (db.Tier, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetTransaction(_ context.Context, id int32) ([]db.Transaction, error) {
+func (s *stubQuerier) GetTransaction(_ context.Context, id int32) (db.Transaction, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListCFOrgs(_ context.Context) ([]db.CFOrg, error) {
@@ -172,6 +181,9 @@ func (s *stubQuerier) ListTransactions(_ context.Context) ([]db.Transaction, err
 	panic("unimplemented")
 }
 func (s *stubQuerier) ListTransactionsWide(_ context.Context) ([]db.ListTransactionsWideRow, error) {
+	panic("unimplemented")
+}
+func (s *stubQuerier) PostUsage(_ context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) SumEntries(_ context.Context) ([]pgtype.Numeric, error) {

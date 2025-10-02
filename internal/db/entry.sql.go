@@ -11,6 +11,68 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getEntriesForCustomerAndType = `-- name: GetEntriesForCustomerAndType :many
+SELECT e.transaction_id, e.account_id, e.direction, e.amount_microcredits
+FROM entry e
+JOIN account a ON e.account_id = a.id
+JOIN customer c ON a.customer_id = c.id
+WHERE c.name = $1
+AND a.type = $2
+`
+
+type GetEntriesForCustomerAndTypeParams struct {
+	Name string
+	Type int32
+}
+
+func (q *Queries) GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error) {
+	rows, err := q.db.Query(ctx, getEntriesForCustomerAndType, arg.Name, arg.Type)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Entry
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.AccountID,
+			&i.Direction,
+			&i.AmountMicrocredits,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEntry = `-- name: GetEntry :one
+SELECT transaction_id, account_id, direction, amount_microcredits
+FROM entry
+WHERE transaction_id = $1 AND account_id = $2
+`
+
+type GetEntryParams struct {
+	TransactionID int32
+	AccountID     int32
+}
+
+func (q *Queries) GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error) {
+	row := q.db.QueryRow(ctx, getEntry, arg.TransactionID, arg.AccountID)
+	var i Entry
+	err := row.Scan(
+		&i.TransactionID,
+		&i.AccountID,
+		&i.Direction,
+		&i.AmountMicrocredits,
+	)
+	return i, err
+}
+
 const sumEntries = `-- name: SumEntries :many
 SELECT
   sum(direction * amount_microcredits / 1e6)
