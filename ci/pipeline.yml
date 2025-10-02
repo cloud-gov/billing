@@ -11,18 +11,14 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: false
           - get: src
-            resource: src
-            trigger: true # App code changes trigger a rebuild
+            trigger: true
             passed: [set-self]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-plan
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params: &tf-billing-development
           TERRAFORM_ACTION: plan
           TEMPLATE_SUBDIR: ci/terraform/stack
@@ -41,7 +37,7 @@ jobs:
             CF_CLIENT_SECRET: ((billing-cf-client-secret-development))
             OIDC_ISSUER: ((oidc-issuer-development))
           TF_VAR_org_name: ((org-name))
-          TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_path: ../../.. # src, relative to TEMPLATE_SUBDIR, where terraform executes
           TF_VAR_space_name: ((space-name))
       - put: terraform-plugin-cache
         params:
@@ -52,25 +48,21 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: false
           - get: src
-            resource: src
             trigger: true
             passed: [terraform-plan-billing-development]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-apply
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params:
           <<: *tf-billing-development
           TF_UPDATE_PLUGIN_CACHE: false
           TERRAFORM_ACTION: apply
       - task: terraform-cleanup
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-cleanup.yml
+        file: src/ci/terraform/terraform-cleanup.yml
         params:
           CF_API_URL: ((dev-cf-api-url))
           CF_CLIENT_ID: ((deploy-billing-cf-client-id))
@@ -81,18 +73,14 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: false
           - get: src
-            resource: src
             trigger: true
             passed: [terraform-apply-billing-development]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-plan
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params: &tf-billing-staging
           TERRAFORM_ACTION: plan
           TEMPLATE_SUBDIR: ci/terraform/stack
@@ -111,7 +99,7 @@ jobs:
             CF_CLIENT_SECRET: ((billing-cf-client-secret-staging))
             OIDC_ISSUER: ((oidc-issuer-staging))
           TF_VAR_org_name: ((org-name))
-          TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_path: ../../.. # src, relative to TEMPLATE_SUBDIR, where terraform executes
           TF_VAR_space_name: ((space-name))
 
   - name: terraform-apply-billing-staging
@@ -119,24 +107,20 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: false
           - get: src
-            resource: src
             trigger: true
             passed: [terraform-plan-billing-staging]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-apply
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params:
           <<: *tf-billing-staging
           TERRAFORM_ACTION: apply
       - task: terraform-cleanup
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-cleanup.yml
+        file: src/ci/terraform/terraform-cleanup.yml
         params:
           CF_API_URL: ((staging-cf-api-url))
           CF_CLIENT_ID: ((deploy-billing-cf-client-id))
@@ -147,18 +131,14 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
           - get: src
-            resource: src
-            trigger: true # App code changes trigger a rebuild
+            trigger: true
             passed: [terraform-apply-billing-staging]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-plan
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params: &tf-billing-production
           TERRAFORM_ACTION: plan
           TEMPLATE_SUBDIR: ci/terraform/stack
@@ -177,7 +157,7 @@ jobs:
             CF_CLIENT_SECRET: ((billing-cf-client-secret-production))
             OIDC_ISSUER: ((oidc-issuer-production))
           TF_VAR_org_name: ((org-name))
-          TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_path: ../../.. # src, relative to TEMPLATE_SUBDIR, where terraform executes
           TF_VAR_space_name: ((space-name))
 
   - name: terraform-apply-billing-production
@@ -185,24 +165,20 @@ jobs:
       - in_parallel:
           - get: terraform-plugin-cache
             trigger: false
-          - get: terraform-templates
-            resource: terraform-config
-            trigger: true # Changes to the terraform deployment code trigger a rebuild
           - get: src
-            resource: src
-            trigger: true # Pipeline changes do not automatically trigger a rebuild
+            trigger: true
             passed: [terraform-plan-billing-production]
           - get: pipeline-tasks
           - get: general-task
       - task: terraform-apply
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-apply.yml
+        file: src/ci/terraform/terraform-apply.yml
         params:
           <<: *tf-billing-production
           TERRAFORM_ACTION: apply
       - task: terraform-cleanup
         image: general-task
-        file: terraform-templates/ci/terraform/terraform-cleanup.yml
+        file: src/ci/terraform/terraform-cleanup.yml
         params:
           CF_API_URL: ((prod-cf-api-url))
           CF_CLIENT_ID: ((deploy-billing-cf-client-id))
@@ -215,15 +191,6 @@ resources:
       commit_verification_keys: ((cloud-gov-pgp-keys))
       uri: https://github.com/cloud-gov/cg-pipeline-tasks.git
       branch: main
-
-  - name: terraform-config
-    type: git
-    source:
-      commit_verification_keys: ((cloud-gov-pgp-keys))
-      uri: https://github.com/cloud-gov/billing.git
-      branch: main
-      paths:
-        - ci/terraform/*
 
   - name: general-task
     type: registry-image

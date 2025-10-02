@@ -33,4 +33,5 @@ variable "environment" {
     CF_CLIENT_SECRET = string
     OIDC_ISSUER      = string
   })
+  sensitive = true
 }
