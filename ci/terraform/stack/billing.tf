@@ -33,7 +33,7 @@ resource "cloudfoundry_app" "billing" {
 
   environment = merge(
     {
-      "GOVERSION" = "1.25"
+      "GOVERSION" = "1.24"
     },
     var.environment
   )
