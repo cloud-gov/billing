@@ -298,7 +298,6 @@ resources:
       repository: cloud-gov/billing
       access_token: ((cg-ci-bot-ghtoken))
       disable_forks: true
-      base_branch: main
 
   - name: postgres
     type: registry-image
