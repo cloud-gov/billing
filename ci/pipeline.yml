@@ -54,6 +54,8 @@ jobs:
             passed: [set-self]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-plan
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
@@ -76,6 +78,7 @@ jobs:
             OIDC_ISSUER: ((oidc-issuer-development))
           TF_VAR_org_name: ((org-name))
           TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_short_ref: ((.:short-ref))
           TF_VAR_space_name: ((space-name))
       - put: terraform-plugin-cache
         params:
@@ -118,6 +121,8 @@ jobs:
             passed: [terraform-apply-billing-development]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-plan
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
@@ -140,6 +145,7 @@ jobs:
             OIDC_ISSUER: ((oidc-issuer-staging))
           TF_VAR_org_name: ((org-name))
           TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_short_ref: ((.:short-ref))
           TF_VAR_space_name: ((space-name))
 
   - name: terraform-apply-billing-staging
@@ -178,6 +184,8 @@ jobs:
             passed: [terraform-apply-billing-staging]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-plan
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
@@ -200,6 +208,7 @@ jobs:
             OIDC_ISSUER: ((oidc-issuer-production))
           TF_VAR_org_name: ((org-name))
           TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
+          TF_VAR_short_ref: ((.:short-ref))
           TF_VAR_space_name: ((space-name))
 
   - name: terraform-apply-billing-production
