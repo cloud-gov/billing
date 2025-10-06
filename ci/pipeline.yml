@@ -95,6 +95,8 @@ jobs:
             passed: [terraform-plan-billing-development]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-apply
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
@@ -159,6 +161,8 @@ jobs:
             passed: [terraform-plan-billing-staging]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-apply
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
@@ -222,6 +226,8 @@ jobs:
             passed: [terraform-plan-billing-production]
           - get: pipeline-tasks
           - get: general-task
+      - load_var: short-ref
+        file: terraform-templates/.git/short_ref
       - task: terraform-apply
         image: general-task
         file: terraform-templates/ci/terraform/terraform-apply.yml
