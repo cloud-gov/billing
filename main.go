@@ -8,16 +8,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"runtime"
-	"time"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/robfig/cron/v3"
 
 	"github.com/cloud-gov/billing/internal/api"
 	"github.com/cloud-gov/billing/internal/config"
@@ -110,32 +105,7 @@ func run(ctx context.Context, out io.Writer) error {
 	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId}) // todo check alg
 
 	logger.Debug("run: initializing River workers and client")
-	workers := river.NewWorkers()
-	river.AddWorker(workers, jobs.NewMeasureUsageWorker(logger, conn, q, rdr))
-
-	schedule, err := cron.ParseStandard("1 * * * *") // Read usage every hour, one minute after the hour.
-	if err != nil {
-		return ErrCrontab
-	}
-	riverc, err := river.NewClient(riverpgxv5.New(conn), &river.Config{
-		JobTimeout: 10 * time.Minute,
-		Logger:     logger,
-		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: runtime.GOMAXPROCS(0)}, // Run as many workers as we have CPU cores available.
-		},
-		PeriodicJobs: []*river.PeriodicJob{
-			river.NewPeriodicJob(
-				schedule,
-				func() (river.JobArgs, *river.InsertOpts) {
-					return jobs.MeasureUsageArgs{
-						Periodic: true,
-					}, nil
-				},
-				nil,
-			),
-		},
-		Workers: workers,
-	})
+	riverc, err := jobs.NewClient(conn, logger, q, rdr)
 	if err != nil {
 		return fmtErr(ErrRiverClientNew, err)
 	}
