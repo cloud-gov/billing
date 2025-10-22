@@ -20,15 +20,20 @@ const (
 
 // Tier defines model for Tier.
 type Tier struct {
-	CreditsPerMonth int     `json:"creditsPerMonth"`
-	Id              *string `json:"id,omitempty"`
-	Name            string  `json:"name"`
+	CreditsPerYear int    `json:"creditsPerYear"`
+	Id             string `json:"id"`
+	Name           string `json:"name"`
 }
 
 // TierCreate defines model for TierCreate.
 type TierCreate struct {
-	CreditsPerMonth int    `json:"creditsPerMonth"`
-	Name            string `json:"name"`
+	CreditsPerYear int    `json:"creditsPerYear"`
+	Name           string `json:"name"`
+}
+
+// UsageJob defines model for UsageJob.
+type UsageJob struct {
+	Id int `json:"id"`
 }
 
 // CreateTierJSONRequestBody defines body for CreateTier for application/json ContentType.
@@ -315,12 +320,13 @@ type CreateUsageJobResponseObject interface {
 	VisitCreateUsageJobResponse(w http.ResponseWriter) error
 }
 
-type CreateUsageJob202Response struct {
-}
+type CreateUsageJob202JSONResponse UsageJob
 
-func (response CreateUsageJob202Response) VisitCreateUsageJobResponse(w http.ResponseWriter) error {
+func (response CreateUsageJob202JSONResponse) VisitCreateUsageJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(202)
-	return nil
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 // StrictServerInterface represents all server handlers.

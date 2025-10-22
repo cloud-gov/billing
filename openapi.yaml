@@ -1,4 +1,4 @@
-openapi: 3.0.0
+openapi: 3.0.0 # Maximum version supported by oapi-codegen.
 info:
   title: Cloud.gov Billing API
   version: "0.1.0"
@@ -39,6 +39,10 @@ paths:
       responses:
         "202":
           description: Job accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageJob"
   /admin/usage/app/{guid}:
     post:
       summary: Enqueue usage-collection for a single app
@@ -67,10 +71,12 @@ components:
       properties:
         name:
           type: string
-        creditsPerMonth:
+        creditsPerYear:
           type: integer
-          minimum: 1
-      required: [name, creditsPerMonth]
+          minimum: 0
+      required:
+        - name
+        - creditsPerYear
     Tier:
       allOf:
         - $ref: "#/components/schemas/TierCreate"
@@ -78,3 +84,12 @@ components:
           properties:
             id:
               type: string
+          required:
+            - id
+    UsageJob:
+      type: object
+      properties:
+        id:
+          type: integer
+      required:
+        - id
