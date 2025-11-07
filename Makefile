@@ -52,8 +52,17 @@ debug-test-db:
 	@set -a; source docker.env; PGPORT=5433; set +a; \
 	dlv test ./internal/dbx -- -test.run TestDBPostUsage
 
+.PHONY: watch-setup
+watch-setup:
+	@if [ -z $(shell which entr) ]; then \
+	  echo -en "\033[0;33m"; \
+		echo "entr not found, attempting to install via \`brew install entr\`..."; \
+		brew install entr; \
+		echo -e "\033[0m"; \
+  fi;
+
 .PHONY: watchgen
-watchgen:
+watchgen: watch-setup
 	@echo "Watching for .sql file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		find . -type f -name '*.sql' | entr -d make gen ; \
@@ -63,7 +72,7 @@ watchgen:
 # Run entr in a while loop because it exits when files are deleted.
 # Run targets db-up and db-init before running.
 .PHONY: watch
-watch:
+watch: watch-setup
 	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		set -a; source docker.env; set +a; \
@@ -73,7 +82,7 @@ watch:
 	done
 
 .PHONY: watchtest
-watchtest:
+watchtest: watch-setup
 	@echo "Running unit tests every time .go files change. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		sleep 0.5 ; \
@@ -175,7 +184,12 @@ test-db-ci:
 
 .PHONY: jwt
 jwt:
-	@set -a; source docker.env; set +a; \
+	@if [ -z $(shell which uaac) ]; then \
+	  echo -en "\033[0;33m"; \
+		echo "cf-uaac not found, attempting to install via \`gem install cf-uaac\`..."; \
+		gem install cf-uaac; \
+		echo -e "\033[0m"; \
+  fi
 	uaac target $${OIDC_ISSUER%/oauth/token}; \
 	uaac token client get $$CF_CLIENT_ID -s $$CF_CLIENT_SECRET --scope "usage.admin"; \
 	uaac context billing | grep access_token | awk '{print $$2}' > jwt.txt
