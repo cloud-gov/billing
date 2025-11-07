@@ -1,9 +1,11 @@
 # Use bash so we can use `source`.
 SHELL := /bin/bash
 
-# Souce docker.env, export all valid keys
-include docker.env
-export $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' docker.env)
+# Source docker.env if it exists and export all valid keys
+ifneq ("$(wildcard docker.env)", "")
+	include docker.env
+	export $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' docker.env)
+endif
 
 .PHONY: db-up
 db-up:
