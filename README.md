@@ -34,6 +34,7 @@ make psql-testdb # Connect to the test database.
 Make request to the locally running server:
 
 ```sh
+# Requires `cf-uaac` and will attempt to install if missing.
 make jwt # Get a token from the configured UAA, based on OIDC_ISSUER host. Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
 curl -H "Authorization: bearer $(cat jwt.txt)" localhost:8080/some/path # Make a request with the authentication header set.
 ```
