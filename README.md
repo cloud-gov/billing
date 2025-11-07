@@ -11,10 +11,13 @@ Copy `docker.env.example` to `docker.env` and fill in any missing values.
 Set up the database:
 
 ```sh
-make migrate
+make db-up
+make db-migrate
 ```
 
 Most development tasks can be achieved using the Make targets defined in [Makefile](./Makefile). See the Makefile for the full list.
+
+The watchers use [Event Notify Test Runner](https://github.com/eradman/entr) (`brew install entr`).
 
 ```sh
 make watchgen # Watch .sql files for changes. On change, regenerate database Go bindings with sqlc. Consider running this in a separate shell at the same time as 'make watch'.
@@ -34,9 +37,12 @@ make psql-testdb # Connect to the test database.
 Make request to the locally running server:
 
 ```sh
+# Get a token from the configured UAA, based on OIDC_ISSUER host.
+# Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
 # Requires `cf-uaac` and will attempt to install if missing.
-make jwt # Get a token from the configured UAA, based on OIDC_ISSUER host. Requires CF_CLIENT_ID and CF_CLIENT_SECRET to be set.
-curl -H "Authorization: bearer $(cat jwt.txt)" localhost:8080/some/path # Make a request with the authentication header set.
+make jwt
+# Make a request with the authentication header set.
+curl -H "Authorization: bearer $(cat jwt.txt)" localhost:8080/some/path
 ```
 
 ### Cloud Foundry
@@ -49,7 +55,7 @@ Note that table name `schema_version` is reserved by tern for tracking migration
 
 Connect to the database in a CF environment with [cf-service-connect](https://github.com/cloud-gov/cf-service-connect):
 
-```
+```sh
 cf connect-to-service billing billing-db
 ```
 
@@ -85,7 +91,7 @@ Tests follow these naming conventions:
 
 The program has the following structure:
 
-```
+```text
 sql/          # Source SQL for sqlc to convert into Go.
   init/       # Database creation must be separate from migrations so Tern has something to connect to.
   migrations/ # Schema for billing service tables.
