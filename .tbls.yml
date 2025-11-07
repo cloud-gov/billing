@@ -1,0 +1,15 @@
+# DSN (Database Source Name) to connect database
+dsn: pg://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}?sslmode=disable
+
+# Path to generate document
+docPath: docs/db-schema
+
+# Tables to exclude from generation
+exclude:
+  - schema_version # used by Tern to track migrations
+  - river_* # generated River queue tables
+
+# Settings for generated diagrams
+er:
+  format: mermaid # gets cleaner results than SVG
+  distance: 2 # help to prevent overlap

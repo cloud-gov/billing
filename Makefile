@@ -23,6 +23,12 @@ gen: db-up
 	go generate ./...
 	@echo "Done."
 
+.PHONY: db-docs-gen
+db-docs-gen: db-up
+	@echo "Generating database docs..."
+	@go run github.com/k1LoW/tbls@v1.91.2 doc --rm-dist
+	@echo "Done."
+
 .PHONY: build
 build: gen
 	go build .
