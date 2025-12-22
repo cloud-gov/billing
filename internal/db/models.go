@@ -60,8 +60,8 @@ func (ns NullTransactionType) Value() (driver.Value, error) {
 
 type Account struct {
 	ID         int32
-	CustomerID int64
 	Type       int32
+	CustomerID pgtype.UUID
 }
 
 type AccountType struct {
@@ -73,13 +73,14 @@ type AccountType struct {
 type CFOrg struct {
 	ID         pgtype.UUID
 	Name       pgtype.Text
-	CustomerID pgtype.Int8
+	CustomerID pgtype.UUID
 }
 
 type Customer struct {
-	ID     int64
+	OldID  int64
 	Name   string
 	TierID pgtype.Int4
+	ID     pgtype.UUID
 }
 
 type Entry struct {
@@ -152,5 +153,5 @@ type Transaction struct {
 	Description pgtype.Text
 	Type        TransactionType
 	// CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.
-	CustomerID pgtype.Int8
+	CustomerID pgtype.UUID
 }

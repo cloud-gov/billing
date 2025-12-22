@@ -1,4 +1,6 @@
 
+\restrict 5KeQDKZkag9opgx1ecJTKLdzQYoRnVSixeJi9OyUMrb8Fng3AiapVi0d94ggfJ0
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -9,6 +11,10 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+CREATE EXTENSION IF NOT EXISTS ltree WITH SCHEMA public;
+
+COMMENT ON EXTENSION ltree IS 'data type for hierarchical tree-like structures';
 
 CREATE TYPE public.river_job_state AS ENUM (
     'available',
@@ -36,18 +42,21 @@ COMMENT ON TYPE public.transaction_type IS 'TransactionType explains why the tra
 CREATE FUNCTION public.assert_transaction_balances() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+DECLARE
+	v_tx bigint := COALESCE(NEW.transaction_id, OLD.transaction_id);
+	v_sum bigint;
 BEGIN
-    PERFORM 1
-    FROM entry e
-    GROUP BY e.transaction_id
-    HAVING SUM(e.amount) <> 0;
+	SELECT (COALESCE(SUM(e.amount_microcredits * e.direction), 0))
+	INTO v_sum
+	FROM entry e
+	WHERE transaction_id = v_tx;
 
-    IF FOUND THEN
-        RAISE EXCEPTION
-          'ledger error: at least one transaction is not balanced (sum(amount) <> 0)';
-    END IF;
-
-    RETURN NULL;
+	IF v_sum <> 0 THEN
+		RAISE EXCEPTION
+			USING
+				MESSAGE = format('ledger error: transaction %s is not balanced; sum(amount_microcredits)=%s', v_tx, v_sum);
+	END IF;
+	RETURN NULL;
 END;
 $$;
 
@@ -62,7 +71,65 @@ CREATE FUNCTION public.bounds_month_prev(as_of timestamp with time zone DEFAULT 
 	FROM bounds_base;
 $$;
 
-CREATE FUNCTION public.post_usage(as_of timestamp with time zone DEFAULT now()) RETURNS TABLE(customer_id bigint, total_amount_microcredits bigint)
+CREATE FUNCTION public.move_customer(p_customer_id uuid, p_new_parent_id uuid) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+declare
+  v_old_path ltree;
+  v_new_parent_path ltree;
+  v_new_path ltree;
+begin
+  select path into v_old_path 
+  from customer where id = p_customer_id;
+
+  select path into v_new_parent_path 
+  from customer where id = p_new_parent_id;
+
+  if v_new_parent_path <@ v_old_path then
+    raise exception 'cannot move customer to its own descendant';
+  end if;
+
+  v_new_path := v_new_parent_path || subpath(v_old_path, -1, 1);
+
+  update customer
+  set 
+    path = v_new_path || subpath(path, nlevel(v_old_path))
+  where path <@ v_old_path;
+
+  return true;
+end;
+$$;
+
+CREATE FUNCTION public.move_resource_node(p_resource_node_id uuid, p_new_parent_id uuid) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+declare
+  v_old_path ltree;
+  v_new_parent_path ltree;
+  v_new_path ltree;
+begin
+  select path into v_old_path 
+  from resource_node where id = p_resource_node_id;
+
+  select path into v_new_parent_path 
+  from resource_node where id = p_new_parent_id;
+
+  if v_new_parent_path <@ v_old_path then
+    raise exception 'cannot move resource_node to its own descendant';
+  end if;
+
+  v_new_path := v_new_parent_path || subpath(v_old_path, -1, 1);
+
+  update resource_node
+  set 
+    path = v_new_path || subpath(path, nlevel(v_old_path))
+  where path <@ v_old_path;
+
+  return true;
+end;
+$$;
+
+CREATE FUNCTION public.post_usage(as_of timestamp with time zone DEFAULT now()) RETURNS TABLE(transaction_id integer)
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -89,39 +156,41 @@ BEGIN
 		GROUP BY c.id
 	),
 	ins_tx AS (
-		INSERT INTO transaction(customer_id, occurred_at, description, type)
+		INSERT INTO transaction AS txn(customer_id, occurred_at, description, type)
 		SELECT
 			mt.customer_id,
 			pe,
-			format('Monthly usage %s-%s', to_char(ps, 'YYYY-MM-DD'), to_char(pe, 'YYYY-MM-DD')),
 			'usage_post'
 		FROM measurement_totals AS mt
 		WHERE mt.total_amount_microcredits <> 0
-		RETURNING id, customer_id
+		RETURNING txn.id, txn.customer_id
 	),
 	ins_entries AS (
-		INSERT INTO entry(transaction_id, account_id, direction, amount_microcredits)
+		INSERT INTO entry AS e(transaction_id, account_id, direction, amount_microcredits)
 		SELECT
 			it.id,
-			e.account_id,
-			e.normal,
+			ac.account_id,
+			ac.normal,
 			mt.total_amount_microcredits
 		FROM ins_tx AS it
 		JOIN measurement_totals AS mt
 		ON it.customer_id = mt.customer_id
 		JOIN LATERAL (
-			SELECT a.id, a.normal
+			SELECT a.id, at.normal
 			FROM account AS a
 			JOIN account_type AS at
-			ON a.id = at.id
+			ON a.type = at.id
 			WHERE a.customer_id = it.customer_id
-			AND (a.name = 'credit_pool' OR a.name = 'credits_used')
+			AND (at.name = 'credit_pool' OR at.name = 'credits_used')
 			LIMIT 2
-		) AS e(account_id, normal) ON TRUE
-		RETURNING transaction_id
+		) AS ac(account_id, normal) ON TRUE
+		RETURNING e.transaction_id, e.account_id, e.direction, e.amount_microcredits
 	)
-	SELECT mt.customer_id::bigint, mt.total_amount_microcredits::bigint FROM measurement_totals mt;
+	SELECT DISTINCT e.transaction_id
+	FROM ins_entries AS e;
 END $$;
+
+COMMENT ON FUNCTION public.post_usage(as_of timestamp with time zone) IS 'post_usage returns all entries, plus their associated customer_id. This function must be run in a transaction.';
 
 CREATE FUNCTION public.river_job_state_in_bitmask(bitmask bit, state public.river_job_state) RETURNS boolean
     LANGUAGE sql IMMUTABLE
@@ -188,14 +257,33 @@ BEGIN
 	RETURN updated;
 END $$;
 
+CREATE FUNCTION public.uuid_generate_v7() RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+begin
+  return encode(
+    set_bit(
+      set_bit(
+        overlay(uuid_send(gen_random_uuid())
+                placing substring(int8send(floor(extract(epoch from clock_timestamp()) * 1000)::bigint) from 3)
+                from 1 for 6
+        ),
+        52, 1
+      ),
+      53, 1
+    ),
+    'hex')::uuid;
+end
+$$;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 CREATE TABLE public.account (
     id integer NOT NULL,
-    customer_id bigint,
-    type integer
+    type integer NOT NULL,
+    customer_id uuid
 );
 
 CREATE SEQUENCE public.account_id_seq
@@ -217,13 +305,17 @@ CREATE TABLE public.account_type (
 CREATE TABLE public.cf_org (
     id uuid NOT NULL,
     name text,
-    customer_id bigint
+    customer_id uuid
 );
 
 CREATE TABLE public.customer (
-    id bigint NOT NULL,
+    old_id bigint NOT NULL,
     name text NOT NULL,
-    tier_id integer
+    tier_id integer,
+    id uuid DEFAULT public.uuid_generate_v7() NOT NULL,
+    path public.ltree,
+    slug character varying(256),
+    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text))
 );
 
 CREATE SEQUENCE public.customer_id_seq
@@ -233,12 +325,12 @@ CREATE SEQUENCE public.customer_id_seq
     NO MAXVALUE
     CACHE 1;
 
-ALTER SEQUENCE public.customer_id_seq OWNED BY public.customer.id;
+ALTER SEQUENCE public.customer_id_seq OWNED BY public.customer.old_id;
 
 CREATE TABLE public.entry (
     transaction_id integer NOT NULL,
     account_id integer NOT NULL,
-    direction integer,
+    direction integer NOT NULL,
     amount_microcredits bigint
 );
 
@@ -321,6 +413,14 @@ CREATE TABLE public.resource_kind (
 
 COMMENT ON TABLE public.resource_kind IS 'ResourceKind represents a particular kind of billable resource. Note that natural_id can be empty because some meters may only read one kind of resource, and that resource kind may not have a unique identifier in the target system; it is uniquely identified by the meter name only.';
 
+CREATE TABLE public.resource_node (
+    path public.ltree,
+    slug character varying(256) NOT NULL,
+    customer_id uuid NOT NULL,
+    resource_natural_id text,
+    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text))
+);
+
 CREATE TABLE public.tier (
     id integer NOT NULL,
     name text NOT NULL,
@@ -342,8 +442,10 @@ CREATE TABLE public.transaction (
     occurred_at timestamp with time zone,
     description text,
     type public.transaction_type NOT NULL,
-    customer_id bigint
+    customer_id uuid
 );
+
+COMMENT ON COLUMN public.transaction.customer_id IS 'CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.';
 
 CREATE SEQUENCE public.transaction_id_seq
     AS integer
@@ -357,7 +459,7 @@ ALTER SEQUENCE public.transaction_id_seq OWNED BY public.transaction.id;
 
 ALTER TABLE ONLY public.account ALTER COLUMN id SET DEFAULT nextval('public.account_id_seq'::regclass);
 
-ALTER TABLE ONLY public.customer ALTER COLUMN id SET DEFAULT nextval('public.customer_id_seq'::regclass);
+ALTER TABLE ONLY public.customer ALTER COLUMN old_id SET DEFAULT nextval('public.customer_id_seq'::regclass);
 
 ALTER TABLE ONLY public.price ALTER COLUMN id SET DEFAULT nextval('public.price_id_seq'::regclass);
 
@@ -375,6 +477,12 @@ ALTER TABLE ONLY public.account_type
 
 ALTER TABLE ONLY public.cf_org
     ADD CONSTRAINT cf_org_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.customer
+    ADD CONSTRAINT customer_new_id_key UNIQUE (id);
+
+ALTER TABLE ONLY public.customer
+    ADD CONSTRAINT customer_old_id_key UNIQUE (old_id);
 
 ALTER TABLE ONLY public.customer
     ADD CONSTRAINT customer_pkey PRIMARY KEY (id);
@@ -397,6 +505,9 @@ ALTER TABLE ONLY public.resource_kind
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_meter_natural_id_uq UNIQUE (meter, natural_id);
 
+ALTER TABLE ONLY public.resource_node
+    ADD CONSTRAINT resource_node_pkey PRIMARY KEY (customer_id, slug);
+
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_pkey PRIMARY KEY (meter, natural_id);
 
@@ -406,7 +517,19 @@ ALTER TABLE ONLY public.tier
 ALTER TABLE ONLY public.transaction
     ADD CONSTRAINT transaction_pkey PRIMARY KEY (id);
 
+CREATE INDEX account_customer_type_idx ON public.account USING btree (customer_id, type);
+
+CREATE UNIQUE INDEX account_type_name_uidx ON public.account_type USING btree (name);
+
 CREATE UNIQUE INDEX account_unique ON public.account USING btree (id, type);
+
+CREATE INDEX cf_org_customer_id_idx ON public.cf_org USING btree (customer_id);
+
+CREATE INDEX customer_path_btree_idx ON public.customer USING btree (path);
+
+CREATE INDEX customer_path_gist_idx ON public.customer USING gist (path);
+
+CREATE INDEX customer_path_idx ON public.resource_node USING btree (customer_id, path);
 
 CREATE INDEX idx_reading_created_at ON public.reading USING btree (created_at);
 
@@ -418,11 +541,23 @@ CREATE UNIQUE INDEX idx_resource_meter_natural_id ON public.resource USING btree
 
 COMMENT ON INDEX public.idx_resource_meter_natural_id IS 'Enables efficient deduplicated inserts using BulkCreateResources function.';
 
+CREATE INDEX measurement_meter_resource_natural_idx ON public.measurement USING btree (meter, resource_natural_id);
+
+CREATE INDEX measurement_reading_id_idx ON public.measurement USING btree (reading_id);
+
 CREATE INDEX reading_created_at_idx ON public.reading USING btree (created_at);
+
+CREATE INDEX reading_created_at_utc_idx ON public.reading USING btree (created_at_utc);
 
 CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
 
 COMMENT ON INDEX public.reading_hourly_uq IS 'Make readings unique per hour.';
+
+CREATE INDEX resource_cf_org_id_idx ON public.resource USING btree (cf_org_id);
+
+CREATE INDEX resource_path_btree_idx ON public.resource_node USING btree (path);
+
+CREATE INDEX resource_path_gist_idx ON public.resource_node USING gist (path);
 
 CREATE CONSTRAINT TRIGGER transaction_balances_chk AFTER INSERT OR DELETE OR UPDATE ON public.entry DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.assert_transaction_balances();
 
@@ -438,10 +573,10 @@ ALTER TABLE ONLY public.resource
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT fk_cf_org_id FOREIGN KEY (cf_org_id) REFERENCES public.cf_org(id);
 
-ALTER TABLE ONLY public.cf_org
+ALTER TABLE ONLY public.account
     ADD CONSTRAINT fk_customer_id FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
-ALTER TABLE ONLY public.account
+ALTER TABLE ONLY public.cf_org
     ADD CONSTRAINT fk_customer_id FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
 ALTER TABLE ONLY public.resource_kind
@@ -467,4 +602,9 @@ ALTER TABLE ONLY public.measurement
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT fk_type_id FOREIGN KEY (type) REFERENCES public.account_type(id);
+
+ALTER TABLE ONLY public.resource_node
+    ADD CONSTRAINT resource_node_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id);
+
+\unrestrict 5KeQDKZkag9opgx1ecJTKLdzQYoRnVSixeJi9OyUMrb8Fng3AiapVi0d94ggfJ0
 

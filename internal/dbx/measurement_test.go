@@ -45,7 +45,7 @@ type testData struct {
 	Accounts []Account
 	CFOrgs   []CFOrg
 	// CustomerIDs maps from customer names (known in advance) to customer ID (returned by INSERT).
-	CustomerIDs   map[string]int64
+	CustomerIDs   map[string]pgtype.UUID
 	Customers     []db.Customer
 	Entries       []Entry
 	Measurements  []db.Measurement
@@ -391,7 +391,7 @@ func TestDBPostUsage(t *testing.T) {
 			Name: "boundary test: 1 customer, multiple readings over time",
 			AsOf: asOf,
 			Before: testData{
-				CustomerIDs: map[string]int64{},
+				CustomerIDs: map[string]pgtype.UUID{},
 				Customers: []db.Customer{
 					{
 						Name: customer1Name,
@@ -551,7 +551,7 @@ func TestDBPostUsage(t *testing.T) {
 			Name: "multiple customers with multiple readings in bounds",
 			AsOf: asOf,
 			Before: testData{
-				CustomerIDs: map[string]int64{},
+				CustomerIDs: map[string]pgtype.UUID{},
 				Customers: []db.Customer{
 					{
 						Name: customer1Name,
@@ -751,7 +751,7 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatal("creating CFOrg: could not look up customer ID by name in CustomerIDs map (did you declare it in testData and include a name?)")
 			}
-			v.CFOrg.CustomerID = PgInt8(customerID)
+			v.CFOrg.CustomerID = customerID
 		}
 		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(v.CFOrg))
 		if err != nil {
@@ -856,7 +856,7 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatalf("could not find customer ID for name %v", want.CustomerName)
 			}
-			want.Transaction.CustomerID = PgInt8(custID)
+			want.CustomerID = custID
 			return cmp.Equal(want.Transaction, have, cmp.Comparer(func(x, y int32) bool {
 				// IDs are the only int32 field we're comparing; always return true
 				return true
