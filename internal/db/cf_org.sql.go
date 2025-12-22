@@ -33,7 +33,7 @@ RETURNING id, name, customer_id
 type CreateCFOrgParams struct {
 	ID         pgtype.UUID
 	Name       pgtype.Text
-	CustomerID pgtype.Int8
+	CustomerID pgtype.UUID
 }
 
 func (q *Queries) CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error) {
