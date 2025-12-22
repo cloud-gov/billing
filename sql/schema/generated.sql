@@ -551,7 +551,7 @@ CREATE INDEX reading_created_at_utc_idx ON public.reading USING btree (created_a
 
 CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
 
-COMMENT ON INDEX public.reading_hourly_uq IS 'Make readings unique per hour.';
+CREATE INDEX resource_path_gist_idx ON public.resource_node USING gist (path);
 
 CREATE INDEX resource_cf_org_id_idx ON public.resource USING btree (cf_org_id);
 

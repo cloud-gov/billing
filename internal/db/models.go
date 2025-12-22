@@ -81,6 +81,8 @@ type Customer struct {
 	Name   string
 	TierID pgtype.Int4
 	ID     pgtype.UUID
+	Path   pgtype.Text
+	Slug   pgtype.Text
 }
 
 type Entry struct {
@@ -139,6 +141,13 @@ type ResourceKind struct {
 	Meter     string
 	NaturalID string
 	Name      pgtype.Text
+}
+
+type ResourceNode struct {
+	Path              pgtype.Text
+	Slug              string
+	CustomerID        pgtype.UUID
+	ResourceNaturalID pgtype.Text
 }
 
 type Tier struct {
