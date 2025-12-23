@@ -89,7 +89,7 @@ func (q *Queries) ListTransactions(ctx context.Context) ([]Transaction, error) {
 }
 
 const listTransactionsWide = `-- name: ListTransactionsWide :many
-SELECT transaction_id, account_id, direction, amount_microcredits, account.id, customer_id, type, account_type.id, name, normal
+SELECT transaction_id, account_id, direction, amount_microcredits, account.id, type, customer_id, account_type.id, name, normal
 FROM
   entry
   LEFT JOIN account ON entry.account_id = account.id
