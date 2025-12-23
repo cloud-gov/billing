@@ -11,13 +11,12 @@ alter table customer
 add path ltree,
 add slug varchar(50);
 
-alter table resource
-add path        ltree,
-add slug        varchar(50),
-add customer_id uuid references customer (id);
-
--- essentially namespace the slugs to customers
-create unique index resource_cid_slug_idx on resource (customer_id, slug);
+create table resource_node (
+  path        ltree,
+  slug        varchar(50),
+  customer_id uuid references customer (id),
+  constraint resource_node_pkey primary key (customer_id, slug)
+);
 
 --
 -- MOVE FUNCTIONS
@@ -63,11 +62,11 @@ begin
 end;
 $$ language plpgsql;
 
-create or replace function move_resource(
-  p_resource_id   uuid,
-  p_new_parent_id uuid
+create or replace function move_resource_node(
+  p_resource_node_id uuid,
+  p_new_parent_id    uuid
 )
-returns           boolean as $$
+returns              boolean as $$
 declare
   v_old_path ltree;
   v_new_parent_path ltree;
@@ -75,21 +74,21 @@ declare
 begin
   -- get current path
   select path into v_old_path 
-  from resource where id = p_resource_id;
+  from resource_node where id = p_resource_node_id;
 
   -- get new parent path
   select path into v_new_parent_path 
-  from resource where id = p_new_parent_id;
+  from resource_node where id = p_new_parent_id;
 
   -- check for circular reference
   if v_new_parent_path <@ v_old_path then
-    raise exception 'cannot move resource to its own descendant';
+    raise exception 'cannot move resource_node to its own descendant';
   end if;
 
   -- perform the move
   v_new_path := v_new_parent_path || subpath(v_old_path, -1, 1);
 
-  update resource
+  update resource_node
   set 
     path = v_new_path || subpath(path, nlevel(v_old_path))
   where path <@ v_old_path;
@@ -109,7 +108,7 @@ alter table customer
 add constraint valid_path
 check (path::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$');
 
-alter table resource
+alter table resource_node
 add constraint valid_path
 check (path::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$');
 
@@ -125,23 +124,23 @@ check (path::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$');
 create index customer_path_gist_idx on customer using gist (path);
 create index customer_path_btree_idx on customer using btree (path);
 
--- resource
-create index resource_path_gist_idx on resource using gist (path);
-create index resource_path_btree_idx on resource using btree (path);
+-- resource_node
+create index resource_path_gist_idx on resource_node using gist (path);
+create index resource_path_btree_idx on resource_node using btree (path);
 
 -- For customer isolation
-create index customer_path_idx on resource (customer_id, path);
+create index customer_path_idx on resource_node (customer_id, path);
 
 ---- create above / drop below ----
 
 -- LTREE COLUMNS
 -- …and related constraints & indexes
 alter table customer drop path, drop slug;
-alter table resource drop path, drop slug, drop customer_id;
+drop table resource_node;
 
 -- MOVE FUNCTIONS
 drop function move_customer;
-drop function move_resource;
+drop function move_resource_node;
 
 -- EXTENSIONS
 drop extension ltree;
