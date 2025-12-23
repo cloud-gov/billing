@@ -54,6 +54,7 @@ type Querier interface {
 	GetCustomer(ctx context.Context, id int64) (Customer, error)
 	GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error)
 	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
+	GetResource(ctx context.Context, arg GetResourceParams) (Resource, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
 	GetTransaction(ctx context.Context, id int32) (Transaction, error)
