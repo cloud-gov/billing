@@ -26,6 +26,8 @@ type Querier interface {
 	// BulkCreateResourceKinds creates ResourceKind rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResourceKinds(ctx context.Context, arg BulkCreateResourceKindsParams) error
+	// BulkCreateResourcesNodes creates Resource_Node rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	BulkCreateResourceNodes(ctx context.Context, arg BulkCreateResourceNodesParams) error
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
@@ -56,10 +58,13 @@ type Querier interface {
 	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
 	GetResource(ctx context.Context, arg GetResourceParams) (Resource, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
+	GetResourceNode(ctx context.Context, arg GetResourceNodeParams) (ResourceNode, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
 	GetTransaction(ctx context.Context, id int32) (Transaction, error)
+	ListAncestors(ctx context.Context, subpath string) ([]ResourceNode, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListDescendants(ctx context.Context, path pgtype.Text) ([]ResourceNode, error)
 	ListMeasurements(ctx context.Context) ([]Measurement, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
 	ListResources(ctx context.Context) ([]Resource, error)

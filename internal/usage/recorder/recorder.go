@@ -14,9 +14,7 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-var (
-	ErrReadingExists = errors.New("a reading already exists for the hour of created_at")
-)
+var ErrReadingExists = errors.New("a reading already exists for the hour of created_at")
 
 // RecordReading saves a reading to the database. It returns [ErrReadingExists] if a Reading already exists for the same hour of r.Time.
 func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading, periodic bool) error {
@@ -38,6 +36,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	dbCFOrgs := []pgtype.UUID{}
 	dbKinds := db.BulkCreateResourceKindsParams{}
 	dbResources := db.BulkCreateResourcesParams{}
+	dbResourceNodes := db.BulkCreateResourceNodesParams{}
 	dbMeasurements := db.BulkCreateMeasurementParams{}
 
 	discard := 0
