@@ -60,8 +60,8 @@ func (ns NullTransactionType) Value() (driver.Value, error) {
 
 type Account struct {
 	ID         int32
-	CustomerID int64
 	Type       int32
+	CustomerID pgtype.UUID
 }
 
 type AccountType struct {
@@ -73,13 +73,14 @@ type AccountType struct {
 type CFOrg struct {
 	ID         pgtype.UUID
 	Name       pgtype.Text
-	CustomerID pgtype.Int8
+	CustomerID pgtype.UUID
 }
 
 type Customer struct {
-	ID     int64
+	OldID  int64
 	Name   string
 	TierID pgtype.Int4
+	ID     pgtype.UUID
 }
 
 type Entry struct {

@@ -31,7 +31,7 @@ type Querier interface {
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
 	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
 	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
-	CreateCustomer(ctx context.Context, name string) (int64, error)
+	CreateCustomer(ctx context.Context, name string) (pgtype.UUID, error)
 	CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error)
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
 	CreateMeter(ctx context.Context, name string) (string, error)
@@ -45,13 +45,13 @@ type Querier interface {
 	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
 	CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
-	DeleteCustomer(ctx context.Context, id int64) error
+	DeleteCustomer(ctx context.Context, id pgtype.UUID) error
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
 	GetAccountForCustomerAndType(ctx context.Context, arg GetAccountForCustomerAndTypeParams) (Account, error)
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
-	GetCustomer(ctx context.Context, id int64) (Customer, error)
+	GetCustomer(ctx context.Context, id pgtype.UUID) (Customer, error)
 	GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error)
 	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
