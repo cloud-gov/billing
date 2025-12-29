@@ -52,8 +52,7 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	sut := meter.NewCFServiceMeter(slog.Default(), services, spaces)
 
 	// act
-	readings, err := sut.ReadUsage(t.Context())
-
+	readings, _, err := sut.ReadUsage(t.Context())
 	// assert
 	if err != nil {
 		t.Fatal("error was not expected when reading usage", err)

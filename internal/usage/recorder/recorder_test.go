@@ -29,11 +29,11 @@ type stubQuerier struct {
 	bulkMs          db.BulkCreateMeasurementParams
 }
 
-var ExpectedErr = errors.New("this error was expected")
+var ErrExpected = errors.New("this error was expected")
 
 func (s *stubQuerier) CreateReading(_ context.Context, arg db.CreateReadingParams) (db.Reading, error) {
 	if s.errOn == "CreateReading" {
-		return db.Reading{}, ExpectedErr
+		return db.Reading{}, ErrExpected
 	}
 	s.createReadingTS = arg.CreatedAt
 	return db.Reading{ID: 1}, nil
@@ -41,7 +41,7 @@ func (s *stubQuerier) CreateReading(_ context.Context, arg db.CreateReadingParam
 
 func (s *stubQuerier) CreateUniqueReading(_ context.Context, arg db.CreateUniqueReadingParams) (db.Reading, error) {
 	if s.errOn == "CreateReading" {
-		return db.Reading{}, ExpectedErr
+		return db.Reading{}, ErrExpected
 	}
 	s.createReadingTS = arg.CreatedAt
 	return db.Reading{ID: 1}, nil
@@ -53,7 +53,7 @@ func (s *stubQuerier) BoundsMonthPrev(_ context.Context, asOf pgtype.Timestamptz
 
 func (s *stubQuerier) BulkCreateMeters(_ context.Context, meters []string) error {
 	if s.errOn == "BulkCreateMeters" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkMeters = meters
 	return nil
@@ -61,7 +61,7 @@ func (s *stubQuerier) BulkCreateMeters(_ context.Context, meters []string) error
 
 func (s *stubQuerier) BulkCreateCFOrgs(_ context.Context, orgs []pgtype.UUID) error {
 	if s.errOn == "BulkCreateCFOrgs" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkOrgs = orgs
 	return nil
@@ -69,7 +69,7 @@ func (s *stubQuerier) BulkCreateCFOrgs(_ context.Context, orgs []pgtype.UUID) er
 
 func (s *stubQuerier) BulkCreateResourceKinds(_ context.Context, arg db.BulkCreateResourceKindsParams) error {
 	if s.errOn == "BulkCreateResourceKinds" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkKinds = arg
 	return nil
@@ -77,7 +77,7 @@ func (s *stubQuerier) BulkCreateResourceKinds(_ context.Context, arg db.BulkCrea
 
 func (s *stubQuerier) BulkCreateResources(_ context.Context, arg db.BulkCreateResourcesParams) error {
 	if s.errOn == "BulkCreateResources" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkResources = arg
 	return nil
@@ -85,9 +85,17 @@ func (s *stubQuerier) BulkCreateResources(_ context.Context, arg db.BulkCreateRe
 
 func (s *stubQuerier) BulkCreateMeasurement(_ context.Context, arg db.BulkCreateMeasurementParams) error {
 	if s.errOn == "BulkCreateMeasurement" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkMs = arg
+	return nil
+}
+
+func (s *stubQuerier) BulkCreateResourceNodes(_ context.Context, arg db.BulkCreateResourceNodesParams) error {
+	if s.errOn == "BulkCreateResourceNodes" {
+		return ExpectedErr
+	}
+	s.bulkRNodes = arg
 	return nil
 }
 

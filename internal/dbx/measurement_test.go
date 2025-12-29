@@ -750,7 +750,7 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatal("creating CFOrg: could not look up customer ID by name in CustomerIDs map (did you declare it in testData and include a name?)")
 			}
-			v.CFOrg.CustomerID = customerID
+			v.CustomerID = customerID
 		}
 		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(v.CFOrg))
 		if err != nil {
@@ -795,13 +795,16 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 		}
 	}
 	for _, v := range td.Measurements {
-		q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
+		_, err := q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
 			ReadingID:          v.ReadingID,
 			Meter:              v.Meter,
 			ResourceNaturalID:  v.ResourceNaturalID,
 			Value:              v.Value,
 			AmountMicrocredits: v.AmountMicrocredits,
 		})
+		if err != nil {
+			t.Fatal("creating measurement failed:", err)
+		}
 	}
 }
 
