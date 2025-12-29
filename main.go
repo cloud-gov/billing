@@ -65,9 +65,10 @@ func run(ctx context.Context, out io.Writer) error {
 	}))
 	logger.Info("build version: " + BuildVersion)
 	logger.Debug("run: initializing CF client")
-	cfconf, err := cfconfig.New(c.CFApiUrl,
-
-		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
+	cfconf, err := cfconfig.New(
+		c.CFApiUrl,
+		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret),
+	)
 	if err != nil {
 		return fmtErr(ErrCFConfig, err)
 	}

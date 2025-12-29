@@ -94,7 +94,6 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 
 			// Act
 			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
-
 			// Assert
 			if err != nil {
 				t.Fatal("error calling the function under test", err)
@@ -138,7 +137,7 @@ func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
 		t.Cleanup(func() {
 			err = tx.Rollback(ctx)
 			// Ignore error if the transaction was already committed
-			if err != nil && !errors.Is(pgx.ErrTxClosed, err) {
+			if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				t.Fatal("failed to rollback transaction: ", err)
 			}
 		})
@@ -295,7 +294,6 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 
 	// Act
 	updated, err := q.UpdateMeasurementMicrocredits(t.Context(), asOf)
-
 	// Assert
 	if err != nil {
 		t.Fatal("error occured while calling function under test", err)
@@ -355,6 +353,7 @@ func measurementFromReadingID(m []db.Measurement, id int32) int {
 		return e.ReadingID == id
 	})
 }
+
 func TestDBPostUsage(t *testing.T) {
 	_, _ = time.LoadLocation("America/New_York")
 
