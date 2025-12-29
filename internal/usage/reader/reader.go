@@ -5,17 +5,22 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/cloud-gov/billing/internal/usage/node"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Reading is a point in time at which measurements of billable resources were taken.
 type Reading struct {
 	Time         time.Time
 	Measurements []Measurement
+	Nodes        []*node.Node
 }
 
 // Measurement is a single point-in-time snapshot of the utilization of a billable resource. Measurement only includes information gleaned directly from the target system -- not the database.
 type Measurement struct {
-	OrgID string
+	CustomerID pgtype.UUID
+	OrgID      string
 	// Meter is the name of the meter which produced this [Measurement].
 	Meter string
 	// ResourceKindNaturalID is the "natural" ID of the Kind of billable resource being measured. The ID is maintained by the external system. For example, the plan ID of a Cloud Foundry service instance. Not all ResourceKinds have a natural ID, so this field may be empty.
@@ -29,7 +34,7 @@ type Measurement struct {
 
 // Meter defines a type that can read usage information from a system containing billable resources, akin to a utility meter.
 type Meter interface {
-	ReadUsage(context.Context) ([]Measurement, error)
+	ReadUsage(context.Context) ([]Measurement, []*node.Node, error)
 	Name() string
 }
 
@@ -48,16 +53,18 @@ func New(meters []Meter) *Reader {
 func (rdr *Reader) Read(ctx context.Context) (Reading, error) {
 	reading := Reading{
 		Time:         time.Now().UTC(),
+		Nodes:        make([]*node.Node, 0),
 		Measurements: make([]Measurement, 0),
 	}
 	var reterr error
 
 	for _, p := range rdr.meters {
-		meas, err := p.ReadUsage(ctx)
+		meas, nodes, err := p.ReadUsage(ctx)
 		if err != nil {
 			reterr = errors.Join(reterr, err)
 		}
 		reading.Measurements = append(reading.Measurements, meas...)
+		reading.Nodes = append(reading.Nodes, nodes...)
 	}
 
 	return reading, reterr
