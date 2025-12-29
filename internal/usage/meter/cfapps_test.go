@@ -203,7 +203,7 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 
 			sut := meter.NewCFAppMeter(slog.Default(), &MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
 
-			got, err := sut.ReadUsage(t.Context())
+			got, _, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
