@@ -417,6 +417,7 @@ CREATE TABLE public.resource_node (
     path public.ltree,
     slug character varying(50) NOT NULL,
     customer_id uuid NOT NULL,
+    resource_natural_id text,
     CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$'::text))
 );
 
@@ -485,6 +486,9 @@ ALTER TABLE ONLY public.customer
 
 ALTER TABLE ONLY public.customer
     ADD CONSTRAINT customer_old_id_key1 UNIQUE (old_id);
+
+ALTER TABLE ONLY public.customer
+    ADD CONSTRAINT customer_old_id_key2 UNIQUE (old_id);
 
 ALTER TABLE ONLY public.customer
     ADD CONSTRAINT customer_pkey PRIMARY KEY (id);

@@ -27,6 +27,7 @@ type stubQuerier struct {
 	bulkKinds       db.BulkCreateResourceKindsParams
 	bulkResources   db.BulkCreateResourcesParams
 	bulkMs          db.BulkCreateMeasurementParams
+	bulkRNodes      db.BulkCreateResourceNodesParams
 }
 
 var ExpectedErr = errors.New("this error was expected")
@@ -88,6 +89,14 @@ func (s *stubQuerier) BulkCreateMeasurement(_ context.Context, arg db.BulkCreate
 		return ExpectedErr
 	}
 	s.bulkMs = arg
+	return nil
+}
+
+func (s *stubQuerier) BulkCreateResourceNodes(_ context.Context, arg db.BulkCreateResourceNodesParams) error {
+	if s.errOn == "BulkCreateResourceNodes" {
+		return ExpectedErr
+	}
+	s.bulkRNodes = arg
 	return nil
 }
 
@@ -194,9 +203,19 @@ func (s *stubQuerier) GetResourceNode(_ context.Context, arg db.GetResourceNodeP
 func (s *stubQuerier) GetTier(_ context.Context, id int32) (db.Tier, error) {
 	panic("unimplemented")
 }
+
 func (s *stubQuerier) GetTransaction(_ context.Context, id int32) (db.Transaction, error) {
 	panic("unimplemented")
 }
+
+func (s *stubQuerier) ListAncestors(_ context.Context, path string) ([]db.ResourceNode, error) {
+	panic("unimplemented")
+}
+
+func (s *stubQuerier) ListDescendants(_ context.Context, path string) ([]db.ResourceNode, error) {
+	panic("unimplemented")
+}
+
 func (s *stubQuerier) ListCFOrgs(_ context.Context) ([]db.CFOrg, error) {
 	panic("unimplemented")
 }

@@ -12,26 +12,33 @@ import (
 )
 
 const bulkCreateResourceNodes = `-- name: BulkCreateResourceNodes :exec
-insert into resource_node (customer_id, slug, path)
-select distinct on (rn.customer_id, rn.slug) customer_id, slug, path
+insert into resource_node (customer_id, slug, path, resource_natural_id)
+select distinct on (rn.customer_id, rn.slug) customer_id, slug, path, resource_natural_id
 from
   unnest(
     $1::uuid[],
     $2::text[],
-    $3::ltree[]
-  ) as rn (customer_id, slug, path)
+    $3::ltree[],
+    $4::text[]
+  ) as rn (customer_id, slug, path, resource_natural_id)
 on conflict (customer_id, slug) do nothing
 `
 
 type BulkCreateResourceNodesParams struct {
-	CustomerID []pgtype.UUID
-	Slug       []string
-	Path       []string
+	CustomerID        []pgtype.UUID
+	Slug              []string
+	Path              []string
+	ResourceNaturalID []string
 }
 
 // BulkCreateResourcesNodes creates Resource_Node rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 func (q *Queries) BulkCreateResourceNodes(ctx context.Context, arg BulkCreateResourceNodesParams) error {
-	_, err := q.db.Exec(ctx, bulkCreateResourceNodes, arg.CustomerID, arg.Slug, arg.Path)
+	_, err := q.db.Exec(ctx, bulkCreateResourceNodes,
+		arg.CustomerID,
+		arg.Slug,
+		arg.Path,
+		arg.ResourceNaturalID,
+	)
 	return err
 }
 
@@ -64,11 +71,11 @@ func (q *Queries) GetResourceNode(ctx context.Context, arg GetResourceNodeParams
 
 const listAncestors = `-- name: ListAncestors :many
 select path, slug, customer_id, resource_natural_id from resource_node
-where path @> subpath($1, -1)
+where path @> subpath($1::ltree, -1)
 `
 
-func (q *Queries) ListAncestors(ctx context.Context, subpath string) ([]ResourceNode, error) {
-	rows, err := q.db.Query(ctx, listAncestors, subpath)
+func (q *Queries) ListAncestors(ctx context.Context, path string) ([]ResourceNode, error) {
+	rows, err := q.db.Query(ctx, listAncestors, path)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +101,10 @@ func (q *Queries) ListAncestors(ctx context.Context, subpath string) ([]Resource
 
 const listDescendants = `-- name: ListDescendants :many
 select path, slug, customer_id, resource_natural_id from resource_node
-where subpath(path, -1) <@ $1
+where subpath(path, -1) <@ $1::ltree
 `
 
-func (q *Queries) ListDescendants(ctx context.Context, path pgtype.Text) ([]ResourceNode, error) {
+func (q *Queries) ListDescendants(ctx context.Context, path string) ([]ResourceNode, error) {
 	rows, err := q.db.Query(ctx, listDescendants, path)
 	if err != nil {
 		return nil, err

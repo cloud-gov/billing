@@ -11,7 +11,8 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-// Abstract to interfaces so we can create a mock client for testing.
+// Abstract these to interfaces so we can create a mock client for testing.
+
 type CFSpaceClient interface {
 	ListAll(context.Context, *client.SpaceListOptions) ([]*resource.Space, error)
 }
