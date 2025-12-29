@@ -1,3 +1,4 @@
+// Package recorder saves measurements to the database
 package recorder
 
 import (
@@ -111,7 +112,10 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 
 func pgxUUID(s string) pgtype.UUID {
 	u := pgtype.UUID{}
-	u.Scan(s)
+	err := u.Scan(s)
+	if err != nil {
+		panic(fmt.Sprintf("malformed ID failed type conversion to UUID: %v", s))
+	}
 	return u
 }
 
