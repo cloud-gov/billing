@@ -162,5 +162,5 @@ type Transaction struct {
 	Description pgtype.Text
 	Type        TransactionType
 	// CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.
-	CustomerID pgtype.Int8
+	CustomerID pgtype.UUID
 }

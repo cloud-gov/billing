@@ -44,11 +44,15 @@ alter table customer add new_id uuid default uuid_generate_v7() unique;
 
 alter table cf_org add new_id uuid constraint cfk references customer (new_id);
 alter table account add new_id uuid constraint cfk references customer (new_id);
+alter table transaction add new_id uuid;
 
 update cf_org set new_id = c.new_id from customer as c
 where customer_id = c.id;
 
 update account set new_id = c.new_id from customer as c
+where customer_id = c.id;
+
+update transaction set new_id = c.new_id from customer as c
 where customer_id = c.id;
 
 alter table cf_org drop constraint fk_customer_id;
@@ -61,9 +65,12 @@ alter table customer add primary key (id), add unique (old_id);
 
 alter table cf_org drop customer_id;
 alter table account drop customer_id;
+alter table transaction drop customer_id;
 
 alter table cf_org rename new_id to customer_id;
 alter table account rename new_id to customer_id;
+alter table transaction rename new_id to customer_id;
+comment on column transaction.customer_id is 'CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.';
 
 alter table cf_org rename constraint cfk to fk_customer_id;
 alter table account rename constraint cfk to fk_customer_id;
@@ -80,11 +87,16 @@ alter table cf_org
 add old_id bigint constraint cfk references customer (old_id);
 alter table account
 add old_id bigint constraint cfk references customer (old_id);
+alter table transaction
+add old_id bigint;
 
 update cf_org set old_id = c.old_id from customer as c
 where customer_id = c.id;
 
 update account set old_id = c.old_id from customer as c
+where customer_id = c.id;
+
+update transaction set old_id = c.old_id from customer as c
 where customer_id = c.id;
 
 alter table cf_org drop constraint fk_customer_id;
@@ -99,9 +111,12 @@ alter table customer add primary key (id);
 
 alter table cf_org drop customer_id;
 alter table account drop customer_id;
+alter table transaction drop customer_id;
 
 alter table cf_org rename old_id to customer_id;
 alter table account rename old_id to customer_id;
+alter table transaction rename old_id to customer_id;
+comment on column transaction.customer_id is 'CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.';
 
 alter table cf_org rename constraint cfk to fk_customer_id;
 alter table account rename constraint cfk to fk_customer_id;
