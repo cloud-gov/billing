@@ -32,35 +32,67 @@ func (c *MockAppClient) ListIncludeSpacesAll(_ context.Context, _ *client.AppLis
 	return c.Apps, c.Spaces, c.AppErr
 }
 
-// MockServiceInstanceClient is an in-memory implementation of [meter.CFServiceInstanceClient].
-type MockServiceInstanceClient struct {
-	// need to be able to populate this with service instances for testing
-	ServiceInstances []*resource.ServiceInstance
-}
-
-func NewMockServiceInstanceClient() *MockServiceInstanceClient {
-	return &MockServiceInstanceClient{
-		ServiceInstances: make([]*resource.ServiceInstance, 0),
-	}
-}
-
-func (c *MockServiceInstanceClient) ListAll(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
-	return c.ServiceInstances, nil
-}
-
 // MockSpaceClient is an in-memory mock implementation of [meter.CFSpaceClient].
 type MockSpaceClient struct {
-	Spaces []*resource.Space
+	Data []*resource.Space
 }
 
 func NewMockSpaceClient() *MockSpaceClient {
 	return &MockSpaceClient{
-		Spaces: make([]*resource.Space, 0),
+		Data: make([]*resource.Space, 0),
 	}
 }
 
 func (c *MockSpaceClient) ListAll(_ context.Context, _ *client.SpaceListOptions) ([]*resource.Space, error) {
-	return c.Spaces, nil
+	return c.Data, nil
+}
+
+// MockServiceInstanceClient is an in-memory implementation of [meter.CFServiceInstanceClient].
+type MockServiceInstanceClient struct {
+	// need to be able to populate this with service instances for testing
+	Data []*resource.ServiceInstance
+}
+
+func NewMockServiceInstanceClient() *MockServiceInstanceClient {
+	return &MockServiceInstanceClient{
+		Data: make([]*resource.ServiceInstance, 0),
+	}
+}
+
+func (c *MockServiceInstanceClient) ListAll(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
+	return c.Data, nil
+}
+
+// MockServicePlanClient is an in-memory implementation of [meter.CFServicePlanClient].
+type MockServicePlanClient struct {
+	// need to be able to populate this with service instances for testing
+	Data []*resource.ServicePlan
+}
+
+func NewMockServicePlanClient() *MockServicePlanClient {
+	return &MockServicePlanClient{
+		Data: make([]*resource.ServicePlan, 0),
+	}
+}
+
+func (c *MockServicePlanClient) ListAll(_ context.Context, _ *client.ServicePlanListOptions) ([]*resource.ServicePlan, error) {
+	return c.Data, nil
+}
+
+// MockServiceOfferingClient is an in-memory implementation of [meter.CFServiceOfferingClient].
+type MockServiceOfferingClient struct {
+	// need to be able to populate this with service instances for testing
+	Data []*resource.ServiceOffering
+}
+
+func NewMockServiceOfferingClient() *MockServiceOfferingClient {
+	return &MockServiceOfferingClient{
+		Data: make([]*resource.ServiceOffering, 0),
+	}
+}
+
+func (c *MockServiceOfferingClient) ListAll(_ context.Context, _ *client.ServiceOfferingListOptions) ([]*resource.ServiceOffering, error) {
+	return c.Data, nil
 }
 
 // MockProcessClient is an in-memory implementation of [meter.CFProcessClient].

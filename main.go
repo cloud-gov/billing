@@ -25,10 +25,8 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-var (
-	// BuildVersion is a commit SHA or branch ref. It is set during linking if provided and logged when the application starts.
-	BuildVersion string = "devel"
-)
+// BuildVersion is a commit SHA or branch ref. It is set during linking if provided and logged when the application starts.
+var BuildVersion string = "devel"
 
 var (
 	ErrBadConfig        = errors.New("reading config from environment")
@@ -92,9 +90,10 @@ func run(ctx context.Context, out io.Writer) error {
 	q := dbx.NewQuerier(db.New(conn))
 
 	logger.Debug("run: initializing meters")
+	mClient := &meter.CFAdapter{Client: cfclient}
 	meters := []reader.Meter{
-		meter.NewCFServiceMeter(logger, cfclient.ServiceInstances, cfclient.Spaces),
-		meter.NewCFAppMeter(logger, cfclient.Applications, cfclient.Processes),
+		meter.NewCFServiceMeter(logger, mClient, q),
+		meter.NewCFAppMeter(logger, mClient, q),
 	}
 	rdr := reader.New(meters)
 
