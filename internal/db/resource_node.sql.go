@@ -41,7 +41,7 @@ We can have ambiguous columns because sqlc handles it
 noqa: disable=AM04
 */
 
-select path, slug, customer_id from resource_node
+select path, slug, customer_id, resource_natural_id from resource_node
 where customer_id = $1 and slug = $2
 `
 
@@ -53,12 +53,17 @@ type GetResourceNodeParams struct {
 func (q *Queries) GetResourceNode(ctx context.Context, arg GetResourceNodeParams) (ResourceNode, error) {
 	row := q.db.QueryRow(ctx, getResourceNode, arg.CustomerID, arg.Slug)
 	var i ResourceNode
-	err := row.Scan(&i.Path, &i.Slug, &i.CustomerID)
+	err := row.Scan(
+		&i.Path,
+		&i.Slug,
+		&i.CustomerID,
+		&i.ResourceNaturalID,
+	)
 	return i, err
 }
 
 const listAncestors = `-- name: ListAncestors :many
-select path, slug, customer_id from resource_node
+select path, slug, customer_id, resource_natural_id from resource_node
 where path @> subpath($1, -1)
 `
 
@@ -71,7 +76,12 @@ func (q *Queries) ListAncestors(ctx context.Context, subpath string) ([]Resource
 	var items []ResourceNode
 	for rows.Next() {
 		var i ResourceNode
-		if err := rows.Scan(&i.Path, &i.Slug, &i.CustomerID); err != nil {
+		if err := rows.Scan(
+			&i.Path,
+			&i.Slug,
+			&i.CustomerID,
+			&i.ResourceNaturalID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -83,7 +93,7 @@ func (q *Queries) ListAncestors(ctx context.Context, subpath string) ([]Resource
 }
 
 const listDescendants = `-- name: ListDescendants :many
-select path, slug, customer_id from resource_node
+select path, slug, customer_id, resource_natural_id from resource_node
 where subpath(path, -1) <@ $1
 `
 
@@ -96,7 +106,12 @@ func (q *Queries) ListDescendants(ctx context.Context, path pgtype.Text) ([]Reso
 	var items []ResourceNode
 	for rows.Next() {
 		var i ResourceNode
-		if err := rows.Scan(&i.Path, &i.Slug, &i.CustomerID); err != nil {
+		if err := rows.Scan(
+			&i.Path,
+			&i.Slug,
+			&i.CustomerID,
+			&i.ResourceNaturalID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

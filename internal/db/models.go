@@ -144,9 +144,10 @@ type ResourceKind struct {
 }
 
 type ResourceNode struct {
-	Path       pgtype.Text
-	Slug       string
-	CustomerID pgtype.UUID
+	Path              pgtype.Text
+	Slug              string
+	CustomerID        pgtype.UUID
+	ResourceNaturalID pgtype.Text
 }
 
 type Tier struct {

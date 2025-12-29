@@ -62,8 +62,16 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 		dbMeasurements.ResourceNaturalID = append(dbMeasurements.ResourceNaturalID, m.ResourceNaturalID)
 		dbMeasurements.Value = append(dbMeasurements.Value, int32(m.Value))
 	}
+
 	if discard > 0 {
 		logger.Warn(fmt.Sprintf("discarded %v empty measurements; a meter is returning empty data", discard))
+	}
+
+	for _, n := range r.Nodes {
+		dbResourceNodes.Slug = append(dbResourceNodes.Slug, n.Slug)
+		dbResourceNodes.Path = append(dbResourceNodes.Path, n.Path)
+		dbResourceNodes.CustomerID = append(dbResourceNodes.CustomerID, n.CustomerID)
+		dbResourceNodes.ResourceNaturalID = append(dbResourceNodes.ResourceNaturalID, n.ResourceNaturalID)
 	}
 
 	logger.Debug("creating meters in database")
@@ -86,8 +94,12 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	if err != nil {
 		return err
 	}
+	logger.Debug("creating resource nodes in database")
+	err = q.BulkCreateResourceNodes(ctx, dbResourceNodes)
+	if err != nil {
+		return err
+	}
 	logger.Debug("creating measurements in database")
-
 	// TODO: For some reason, using q.CreateMeasurements, which is implemented with a COPY, does not work here. It works fine for /usage/app/{guid}.
 	err = q.BulkCreateMeasurement(ctx, dbMeasurements)
 	if err != nil {

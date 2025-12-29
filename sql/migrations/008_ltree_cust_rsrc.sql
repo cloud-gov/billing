@@ -12,9 +12,10 @@ add path ltree,
 add slug varchar(50);
 
 create table resource_node (
-  path        ltree,
-  slug        varchar(50),
-  customer_id uuid references customer (id),
+  path                ltree,
+  slug                varchar(50),
+  customer_id         uuid references customer (id),
+  resource_natural_id text,
   constraint resource_node_pkey primary key (customer_id, slug)
 );
 
