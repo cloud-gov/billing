@@ -90,7 +90,8 @@ func (s *stubQuerier) AccountingEquation(_ context.Context) ([]string, error) {
 func (s *stubQuerier) CreateCFOrg(_ context.Context, arg db.CreateCFOrgParams) (db.CFOrg, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) CreateCustomer(_ context.Context, arg string) (int64, error) {
+
+func (s *stubQuerier) CreateCustomer(_ context.Context, arg string) (pgtype.UUID, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) CreateMeasurement(_ context.Context, arg db.CreateMeasurementParams) (db.Measurement, error) {
@@ -123,7 +124,8 @@ func (s *stubQuerier) CreateTransaction(_ context.Context, arg db.CreateTransact
 func (s *stubQuerier) DeleteCFOrg(_ context.Context, id pgtype.UUID) error {
 	panic("unimplemented")
 }
-func (s *stubQuerier) DeleteCustomer(_ context.Context, id int64) error {
+
+func (s *stubQuerier) DeleteCustomer(_ context.Context, id pgtype.UUID) error {
 	panic("unimplemented")
 }
 func (s *stubQuerier) DeleteResource(_ context.Context, arg db.DeleteResourceParams) error {
@@ -138,7 +140,8 @@ func (s *stubQuerier) DeleteTier(_ context.Context, id int32) error {
 func (s *stubQuerier) GetCFOrg(_ context.Context, id pgtype.UUID) (db.CFOrg, error) {
 	panic("unimplemented")
 }
-func (s *stubQuerier) GetCustomer(_ context.Context, id int64) (db.Customer, error) {
+
+func (s *stubQuerier) GetCustomer(_ context.Context, id pgtype.UUID) (db.Customer, error) {
 	panic("unimplemented")
 }
 func (s *stubQuerier) GetAccountForCustomerAndType(_ context.Context, arg db.GetAccountForCustomerAndTypeParams) (db.Account, error) {
@@ -150,6 +153,11 @@ func (s *stubQuerier) GetEntriesForCustomerAndType(_ context.Context, arg db.Get
 func (s *stubQuerier) GetEntry(_ context.Context, arg db.GetEntryParams) (db.Entry, error) {
 	panic("unimplemented")
 }
+
+func (s *stubQuerier) GetResource(_ context.Context, arg db.GetResourceParams) (db.Resource, error) {
+	panic("unimplemented")
+}
+
 func (s *stubQuerier) GetResourceKind(_ context.Context, arg db.GetResourceKindParams) (db.ResourceKind, error) {
 	panic("unimplemented")
 }

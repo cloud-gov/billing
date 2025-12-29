@@ -1,5 +1,5 @@
 
-\restrict OeKStk5skg8QE8DNsyGIWg0ji5bYj9HU9WgUGqEpT2hJhy0YJOfdyeAeWZpLvv2
+\restrict jBw11d0AQlC9AAnuPPStB3gB4CvudGHswkl7oHfurFwYYYlC7NH29Ja232oDMmJ
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -441,7 +441,7 @@ CREATE TABLE public.transaction (
     occurred_at timestamp with time zone,
     description text,
     type public.transaction_type NOT NULL,
-    customer_id bigint
+    customer_id uuid
 );
 
 COMMENT ON COLUMN public.transaction.customer_id IS 'CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID.';
@@ -556,5 +556,5 @@ ALTER TABLE ONLY public.cf_org
 ALTER TABLE ONLY public.resource_node
     ADD CONSTRAINT resource_node_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
-\unrestrict OeKStk5skg8QE8DNsyGIWg0ji5bYj9HU9WgUGqEpT2hJhy0YJOfdyeAeWZpLvv2
+\unrestrict jBw11d0AQlC9AAnuPPStB3gB4CvudGHswkl7oHfurFwYYYlC7NH29Ja232oDMmJ
 
