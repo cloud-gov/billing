@@ -1,3 +1,4 @@
+// Package recorder saves measurements to the database
 package recorder
 
 import (
@@ -14,9 +15,7 @@ import (
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-var (
-	ErrReadingExists = errors.New("a reading already exists for the hour of created_at")
-)
+var ErrReadingExists = errors.New("a reading already exists for the hour of created_at")
 
 // RecordReading saves a reading to the database. It returns [ErrReadingExists] if a Reading already exists for the same hour of r.Time.
 func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r reader.Reading, periodic bool) error {
@@ -100,7 +99,10 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 
 func pgxUUID(s string) pgtype.UUID {
 	u := pgtype.UUID{}
-	u.Scan(s)
+	err := u.Scan(s)
+	if err != nil {
+		panic(fmt.Sprintf("malformed ID failed type conversion to UUID: %v", s))
+	}
 	return u
 }
 
