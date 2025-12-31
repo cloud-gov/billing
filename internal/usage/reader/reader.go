@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cloud-gov/billing/internal/usage/node"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -13,7 +14,7 @@ import (
 type Reading struct {
 	Time         time.Time
 	Measurements []Measurement
-	Nodes        []Node
+	Nodes        []*node.Node
 }
 
 // Measurement is a single point-in-time snapshot of the utilization of a billable resource. Measurement only includes information gleaned directly from the target system -- not the database.
@@ -31,17 +32,9 @@ type Measurement struct {
 	Errs error
 }
 
-type Node struct {
-	CustomerID pgtype.UUID
-	Slug       string
-	Path       string
-	// e.g. an CF App ID, a Workshop namespace ID; may relate to multiple Resources
-	ResourceNaturalID string
-}
-
 // Meter defines a type that can read usage information from a system containing billable resources, akin to a utility meter.
 type Meter interface {
-	ReadUsage(context.Context) ([]Measurement, []Node, error)
+	ReadUsage(context.Context) ([]Measurement, []*node.Node, error)
 	Name() string
 }
 
@@ -60,7 +53,7 @@ func New(meters []Meter) *Reader {
 func (rdr *Reader) Read(ctx context.Context) (Reading, error) {
 	reading := Reading{
 		Time:         time.Now().UTC(),
-		Nodes:        make([]Node, 0),
+		Nodes:        make([]*node.Node, 0),
 		Measurements: make([]Measurement, 0),
 	}
 	var reterr error

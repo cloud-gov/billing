@@ -3,13 +3,16 @@ package meter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"slices"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/usage/node"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
@@ -20,26 +23,23 @@ var (
 	ErrSpaceNotFound = errors.New("CF processes meter: space not found")
 )
 
-type CFProcessClient interface {
-	ListAll(context.Context, *client.ProcessListOptions) ([]*resource.Process, error)
-}
-
-type CFAppClient interface {
-	ListIncludeSpacesAll(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, error)
+type AppMeterDB interface {
+	GetCFOrg(ctx context.Context, id pgtype.UUID) (db.CFOrg, error)
 }
 
 type CFAppMeter struct {
 	logger *slog.Logger
-
-	apps      CFAppClient
-	processes CFProcessClient
+	client AppClient
+	dbq    AppMeterDB
 }
 
-func NewCFAppMeter(logger *slog.Logger, apps CFAppClient, processes CFProcessClient) *CFAppMeter {
+func NewCFAppMeter(
+	logger *slog.Logger, client AppClient, dbq AppMeterDB,
+) *CFAppMeter {
 	return &CFAppMeter{
-		logger:    logger.WithGroup("CFAppMeter"),
-		apps:      apps,
-		processes: processes,
+		logger: logger.WithGroup("CFAppMeter"),
+		client: client,
+		dbq:    dbq,
 	}
 }
 
@@ -47,21 +47,22 @@ func (m *CFAppMeter) Name() string {
 	return "cfapps"
 }
 
-func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []reader.Node, error) {
+func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "app meter: listing processes")
-	procs, err := m.processes.ListAll(ctx, client.NewProcessOptions())
+	procs, err := m.client.ProcessesList(ctx, client.NewProcessOptions())
 	if err != nil {
 		return nil, nil, err
 	}
+
 	m.logger.DebugContext(ctx, "app meter: listing apps")
-	appopts := client.NewAppListOptions() // For fast troubleshooting, set .GUIDs to an app GUID.
-	apps, spaces, err := m.apps.ListIncludeSpacesAll(ctx, appopts)
+	appOpts := client.NewAppListOptions() // For fast troubleshooting, set .GUIDs to an app GUID.
+	apps, spaces, err := m.client.AppsListWithSpaces(ctx, appOpts)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	measurements := []reader.Measurement{}
-	nodes := []reader.Node{}
+	nodes := []*node.Node{}
 
 	// Aggregate process usage info by app.
 	m.logger.DebugContext(ctx, "app meter: aggregating process usage")
@@ -78,7 +79,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []rea
 			continue
 		}
 
-		m := reader.Measurement{
+		msrmt := reader.Measurement{
 			Meter:             m.Name(),
 			ResourceNaturalID: app.GUID,
 			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
@@ -91,24 +92,68 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []rea
 			return s.GUID == spaceGUID
 		})
 		if sidx < 0 {
-			m.Errs = errors.Join(m.Errs, ErrSpaceNotFound)
+			msrmt.Errs = errors.Join(msrmt.Errs, ErrSpaceNotFound)
+			appNode, err := node.New(
+				nil,
+				app.GUID,
+				node.WithSlugAuto("app", app.Name),
+				node.WithPathAuto("orphan"),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			nodes = append(nodes, []*node.Node{appNode}...)
 		} else {
 			cfOrgGUID = spaces[sidx].Relationships.Organization.Data.GUID
-			m.OrgID = cfOrgGUID
+			orgIDParsed := pgtype.UUID{}
+			if err := orgIDParsed.Scan(cfOrgGUID); err != nil {
+				return nil, nil, err
+			}
+
+			org, err := m.dbq.GetCFOrg(ctx, orgIDParsed)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, err
+			}
+
+			customerID := org.CustomerID
+			msrmt.CustomerID = customerID
+			msrmt.OrgID = cfOrgGUID
+
+			cfOrgNode, err := node.New(
+				customerID,
+				cfOrgGUID,
+				node.WithSlugAuto("cforg", org.Name.String),
+				node.WithPathAuto("apps.usage"),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			spaceNode, err := node.New(
+				customerID,
+				spaceGUID,
+				node.WithSlugAuto("space", spaces[sidx].Name),
+				node.WithPathByParent(cfOrgNode),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			appNode, err := node.New(
+				customerID,
+				app.GUID,
+				node.WithSlugAuto("app", app.Name),
+				node.WithPathByParent(spaceNode),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, appNode}...)
 		}
 
-		measurements = append(measurements, m)
-
-		// TODO: Get the customer ID here
-		cfOrgNode := reader.Node{Slug: fmt.Sprintf("cforg_%v", cfOrgGUID), ResourceNaturalID: cfOrgGUID}
-		spaceNode := reader.Node{Slug: fmt.Sprintf("space_%v", spaceGUID), ResourceNaturalID: spaceGUID}
-		appNode := reader.Node{Slug: fmt.Sprintf("app_%v", app.GUID), ResourceNaturalID: app.GUID}
-
-		cfOrgNode.Path = fmt.Sprintf("%v.%v", "xxx.apps.usage", cfOrgNode.Slug)
-		spaceNode.Path = fmt.Sprintf("%v.%v", cfOrgNode.Path, spaceNode.Slug)
-		appNode.Path = fmt.Sprintf("%v.%v", spaceNode.Path, appNode.Slug)
-
-		nodes = append(nodes, []reader.Node{cfOrgNode, spaceNode, appNode}...)
+		measurements = append(measurements, msrmt)
 	}
 
 	return measurements, nodes, nil

@@ -2,46 +2,37 @@ package meter
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/usage/node"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
-// Abstract these to interfaces so we can create a mock client for testing.
-
-type CFSpaceClient interface {
-	ListAll(context.Context, *client.SpaceListOptions) ([]*resource.Space, error)
-}
-type CFServiceInstanceClient interface {
-	ListAll(context.Context, *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error)
-}
-type CFServicePlanClient interface {
-	ListAll(context.Context, *client.ServicePlanListOptions) ([]*resource.ServicePlan, error)
-}
-type CFServiceOfferingClient interface {
-	ListAll(context.Context, *client.ServiceOfferingListOptions) ([]*resource.ServiceOffering, error)
+type ServiceMeterDB interface {
+	GetCFOrg(ctx context.Context, id pgtype.UUID) (db.CFOrg, error)
 }
 
 // CFServiceMeter reads usage from Cloud Foundry service instances.
 type CFServiceMeter struct {
 	logger *slog.Logger
-
-	spaces CFSpaceClient
-
-	services  CFServiceInstanceClient
-	plans     CFServicePlanClient
-	offerings CFServiceOfferingClient
+	client ServiceClient
+	dbq    ServiceMeterDB
 }
 
-func NewCFServiceMeter(logger *slog.Logger, services CFServiceInstanceClient, spaces CFSpaceClient) *CFServiceMeter {
+func NewCFServiceMeter(
+	logger *slog.Logger, client ServiceClient, dbq ServiceMeterDB,
+) *CFServiceMeter {
 	return &CFServiceMeter{
-		logger:   logger.WithGroup("CFServiceMeter"),
-		services: services,
-		spaces:   spaces,
+		logger: logger.WithGroup("CFServiceMeter"),
+		client: client,
+		dbq:    dbq,
 	}
 }
 
@@ -51,74 +42,108 @@ func (m *CFServiceMeter) Name() string {
 
 // ReadUsage returns the point-in-time usage of services in Cloud Foundry.
 // Returns a non-nil error if there was an error during the overall process of reading usage information from the target system. If individual readings had errors, their errs fields should be set.
-func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []reader.Node, error) {
+func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "service meter: listing services")
 	opts := client.NewServiceInstanceListOptions()
 	// Ignore user-provided services, which we do not bill for. IMPORTANT: If this is not set, user-provided services will be included. Some response fields that we assume are non-nil, like .Relationships, will be nil on user-provided services. The code below does not guard against this and will panic.
 	opts.Type = "managed"
-	si, err := m.services.ListAll(ctx, opts)
+	si, err := m.client.ServiceInstancesList(ctx, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	m.logger.DebugContext(ctx, "service meter: getting service plans")
-	sp, err := m.plans.ListAll(ctx, nil)
+	m.logger.DebugContext(ctx, "service meter: getting service plans and offerings")
+	sp, so, err := m.client.ServicePlansOfferingsList(ctx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	spMap := make(map[string]*resource.ServicePlan, len(sp))
+	planMap := make(map[string]*resource.ServicePlan, len(sp))
 	for _, p := range sp {
-		spMap[p.GUID] = p
+		planMap[p.GUID] = p
 	}
 
-	m.logger.DebugContext(ctx, "service meter: getting service offerings")
-	so, err := m.offerings.ListAll(ctx, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	soMap := make(map[string]*resource.ServiceOffering, len(so))
+	offerMap := make(map[string]*resource.ServiceOffering, len(so))
 	for _, o := range so {
-		soMap[o.GUID] = o
+		offerMap[o.GUID] = o
 	}
 
 	m.logger.DebugContext(ctx, "service meter: listing spaces")
 	spaceopts := client.NewSpaceListOptions()
-	spaces, err := m.spaces.ListAll(ctx, spaceopts)
+	spaces, err := m.client.SpacesList(ctx, spaceopts)
 	if err != nil {
 		return nil, nil, err
 	}
+	// TODO: should maybe just use an indexer?
+	spaceMap := make(map[string]*resource.Space, len(spaces))
+	for _, s := range spaces {
+		spaceMap[s.GUID] = s
+	}
 
-	spacesToOrgs := make(map[string]string, len(spaces))
+	spacesToOrgs := make(map[string]*db.CFOrg, len(spaces))
 	for _, space := range spaces {
-		spacesToOrgs[space.GUID] = space.Relationships.Organization.Data.GUID
+		orgID := pgtype.UUID{}
+		if err := orgID.Scan(space.Relationships.Organization.Data.GUID); err != nil {
+			return nil, nil, err
+		}
+		org, err := m.dbq.GetCFOrg(ctx, orgID)
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, err
+			}
+			org.ID = orgID // still get an ID if not in our DB
+		}
+		spacesToOrgs[space.GUID] = &org
 	}
 
 	usage := make([]reader.Measurement, len(si))
-	nodes := make([]reader.Node, len(si)*3) // TODO: return nodes along with usage
+	nodes := make([]*node.Node, 0, len(si)*3)
 
 	m.logger.DebugContext(ctx, "service meter: aggregating services")
 	for i, instance := range si {
-		plan := spMap[instance.Relationships.ServicePlan.Data.GUID]
-		offr := soMap[plan.GUID]
-		slug := fmt.Sprintf("svc_%v_%v_%v", offr.Name, plan.Name, instance.GUID)
-		svcInNode := reader.Node{Slug: slug, ResourceNaturalID: instance.GUID}
+		planID := planMap[instance.Relationships.ServicePlan.Data.GUID]
+		offrID := offerMap[planID.Relationships.ServiceOffering.Data.GUID]
+		spaceID := instance.Relationships.Space.Data.GUID
 
-		// TODO: Get the customer ID here
-		space := instance.Relationships.Space.Data.GUID
-		cfOrg := spacesToOrgs[space]
+		org := spacesToOrgs[spaceID]
+		orgID := org.ID.String()
+		customerID := org.CustomerID
 
-		spaceNode := reader.Node{Slug: fmt.Sprintf("space_%v", space), ResourceNaturalID: space}
-		cfOrgNode := reader.Node{Slug: fmt.Sprintf("cforg_%v", cfOrg), ResourceNaturalID: cfOrg}
+		cfOrgNode, err := node.New(
+			customerID,
+			orgID,
+			node.WithSlugAuto("cforg", org.Name.String),
+			node.WithPathAuto("apps.usage"),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 
-		cfOrgNode.Path = fmt.Sprintf("%v.%v", "xxx.apps.usage", cfOrgNode.Slug)
-		spaceNode.Path = fmt.Sprintf("%v.%v", cfOrgNode.Path, spaceNode.Slug)
-		svcInNode.Path = fmt.Sprintf("%v.%v", spaceNode.Path, svcInNode.Slug)
+		spaceNode, err := node.New(
+			customerID,
+			spaceID,
+			node.WithSlugAuto("space", spaceMap[spaceID].Name),
+			node.WithPathByParent(cfOrgNode),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 
-		nodes = append(nodes, []reader.Node{cfOrgNode, spaceNode, svcInNode}...)
+		svcNode, err := node.New(
+			customerID,
+			instance.GUID,
+			node.WithSlugAuto("svc", offrID.Name, planID.Name, instance.Name),
+			node.WithPathByParent(spaceNode),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, svcNode}...)
 
 		usage[i] = reader.Measurement{
 			Meter:                 m.Name(),
-			OrgID:                 cfOrg,
+			CustomerID:            customerID,
+			OrgID:                 orgID,
 			ResourceKindNaturalID: instance.Relationships.ServicePlan.Data.GUID,
 			ResourceNaturalID:     instance.GUID,
 			Value:                 1, // For this type of service, 1 indicates it is present at time of reading

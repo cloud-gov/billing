@@ -9,7 +9,7 @@ create extension if not exists ltree;
 
 alter table customer
 add path ltree,
-add slug varchar(50);
+add slug varchar(50); -- TODO: change `slug` to `label`
 
 create table resource_node (
   path                ltree,

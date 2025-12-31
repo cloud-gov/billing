@@ -110,11 +110,20 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	return err
 }
 
-func pgxUUID(s string) pgtype.UUID {
+func pgxUUID(s any) pgtype.UUID {
+	switch s := s.(type) {
+	case pgtype.UUID:
+		return s
+	case nil:
+		return pgtype.UUID{}
+	case string:
+		if s == "" {
+			return pgtype.UUID{}
+		}
+	}
 	u := pgtype.UUID{}
-	err := u.Scan(s)
-	if err != nil {
-		panic(fmt.Sprintf("malformed ID failed type conversion to UUID: %v", s))
+	if err := u.Scan(s); err != nil {
+		panic(fmt.Errorf("failed to convert `%#v` to UUID: %w", s, err))
 	}
 	return u
 }
