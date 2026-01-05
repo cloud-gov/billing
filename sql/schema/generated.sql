@@ -1,5 +1,5 @@
 
-\restrict jBw11d0AQlC9AAnuPPStB3gB4CvudGHswkl7oHfurFwYYYlC7NH29Ja232oDMmJ
+\restrict nECFrAobZN86lhKy5m5qh16Rp9vq1l9NU0kTir7eWRmumGfr40mbfLrlGhJi3WA
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -314,8 +314,8 @@ CREATE TABLE public.customer (
     tier_id integer,
     id uuid DEFAULT public.uuid_generate_v7() NOT NULL,
     path public.ltree,
-    slug character varying(50),
-    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$'::text))
+    slug character varying(256),
+    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text))
 );
 
 CREATE SEQUENCE public.customer_id_seq
@@ -415,10 +415,10 @@ COMMENT ON TABLE public.resource_kind IS 'ResourceKind represents a particular k
 
 CREATE TABLE public.resource_node (
     path public.ltree,
-    slug character varying(50) NOT NULL,
+    slug character varying(256) NOT NULL,
     customer_id uuid NOT NULL,
     resource_natural_id text,
-    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$'::text))
+    CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text))
 );
 
 CREATE TABLE public.tier (
@@ -547,6 +547,10 @@ CREATE UNIQUE INDEX idx_resource_meter_natural_id ON public.resource USING btree
 
 COMMENT ON INDEX public.idx_resource_meter_natural_id IS 'Enables efficient deduplicated inserts using BulkCreateResources function.';
 
+CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
+
+COMMENT ON INDEX public.reading_hourly_uq IS 'Make readings unique per hour.';
+
 CREATE INDEX resource_path_btree_idx ON public.resource_node USING btree (path);
 
 CREATE INDEX resource_path_gist_idx ON public.resource_node USING gist (path);
@@ -560,5 +564,5 @@ ALTER TABLE ONLY public.cf_org
 ALTER TABLE ONLY public.resource_node
     ADD CONSTRAINT resource_node_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
-\unrestrict jBw11d0AQlC9AAnuPPStB3gB4CvudGHswkl7oHfurFwYYYlC7NH29Ja232oDMmJ
+\unrestrict nECFrAobZN86lhKy5m5qh16Rp9vq1l9NU0kTir7eWRmumGfr40mbfLrlGhJi3WA
 
