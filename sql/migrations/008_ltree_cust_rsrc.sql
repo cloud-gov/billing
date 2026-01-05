@@ -109,11 +109,11 @@ $$ language plpgsql;
 
 alter table customer
 add constraint valid_path
-check (path::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$');
+check (path::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$');
 
 alter table resource_node
 add constraint valid_path
-check (path::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$');
+check (path::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$');
 
 --
 -- INDEXES
