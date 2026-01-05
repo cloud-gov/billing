@@ -4,16 +4,18 @@ create extension if not exists ltree;
 -- LTREE COLUMNS
 --
 -- Add path & slugs to customer & resource
--- size of slug is restricted to avoid oversize path
+--
+-- size of slug is restricted to max label length as defined in
+-- https://www.postgresql.org/docs/15/ltree.html#id-1.11.7.32.5
 --
 
 alter table customer
 add path ltree,
-add slug varchar(50); -- TODO: change `slug` to `label`
+add slug varchar(256); -- TODO: change `slug` to `label`
 
 create table resource_node (
   path                ltree,
-  slug                varchar(50),
+  slug                varchar(256),
   customer_id         uuid references customer (id),
   resource_natural_id text,
   constraint resource_node_pkey primary key (customer_id, slug)
