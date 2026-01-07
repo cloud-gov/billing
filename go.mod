@@ -1,6 +1,6 @@
 module github.com/cloud-gov/billing
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12.0.20250605163211-41fbb9ee824a
