@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -58,7 +59,13 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		err = tx.Rollback(ctx)
+		if err != nil && !errors.Is(err, pgx.ErrTxClosed) { // closed tx is a successful tx
+			panic(err)
+		}
+	}()
 
 	txquerier := u.querier.WithTx(tx)
 
