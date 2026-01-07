@@ -132,6 +132,10 @@ psql:
 psql-testdb:
 	@set -a; source docker.env; PGPORT=5433; set +a; psql
 
+.PHONY: psql
+riverui:
+	@set -a; source docker.env; set +a; riverui
+
 .PHONY: db-schema
 db-schema:
 	@set -a; source docker.env; set +a; \
