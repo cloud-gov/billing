@@ -65,9 +65,7 @@ func run(ctx context.Context, out io.Writer) error {
 	}))
 	logger.Info("build version: " + BuildVersion)
 	logger.Debug("run: initializing CF client")
-	cfconf, err := cfconfig.New(c.CFApiUrl,
-
-		cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
+	cfconf, err := cfconfig.New(c.CFApiUrl, cfconfig.ClientCredentials(c.CFClientId, c.CFClientSecret))
 	if err != nil {
 		return fmtErr(ErrCFConfig, err)
 	}
@@ -102,7 +100,7 @@ func run(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return fmtErr(ErrOIDCProvider, err)
 	}
-	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId}) // todo check alg
+	verifier := oidcProvider.Verifier(&oidc.Config{ClientID: c.CFClientId})
 
 	logger.Debug("run: initializing River workers and client")
 	riverc, err := jobs.NewClient(conn, logger, q, rdr)
@@ -116,7 +114,11 @@ func run(ctx context.Context, out io.Writer) error {
 	}
 
 	logger.Debug("run: starting web server")
-	srv := server.New(c.Host, c.Port, api.Routes(logger, cfclient, q, riverc, verifier, c), logger)
+	// hasAdminScope := middleware.NewHasScope(logger, verifier, "usage.admin")
+	apiserver := api.NewServer(logger, q, riverc, cfclient, verifier)
+	serveriface := api.NewStrictHandler(&apiserver, []api.StrictMiddlewareFunc{}) // todo, admin middleware
+	srv := server.New(c.Host, c.Port, api.Handler(serveriface), logger)
+	//api.Routes(logger, cfclient, q, riverc, verifier, c)
 	srv.ListenAndServe(ctx)
 	return nil
 }

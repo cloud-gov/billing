@@ -1,0 +1,95 @@
+openapi: 3.0.0 # Maximum version supported by oapi-codegen.
+info:
+  title: Cloud.gov Billing API
+  version: "0.1.0"
+  description: |
+    Administrative endpoints for managing tiers and triggering usage-collection
+    jobs. All routes require an access-token containing the `usage.admin` scope.
+
+servers:
+  - url: https://billing.fr.cloud.gov
+paths:
+  /admin/tier:
+    post:
+      summary: Create a new customer tier
+      description: Adds a pricing tier that can later be assigned to customers.
+      operationId: createTier
+      security:
+        - bearerAuth: [usage.admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TierCreate"
+      responses:
+        "201":
+          description: Tier created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tier"
+  /admin/usage/job:
+    post:
+      summary: Enqueue a full usage-collection job
+      description: Starts an asynchronous job that records usage for all resources.
+      operationId: createUsageJob
+      security:
+        - bearerAuth: [usage.admin]
+      responses:
+        "202":
+          description: Job accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageJob"
+  /admin/usage/app/{guid}:
+    post:
+      summary: Enqueue usage-collection for a single app
+      operationId: createAppUsageJob
+      security:
+        - bearerAuth: [usage.admin]
+      parameters:
+        - name: guid
+          in: path
+          required: true
+          description: Cloud Foundry app GUID
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Job accepted for processing
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TierCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        creditsPerYear:
+          type: integer
+          minimum: 0
+      required:
+        - name
+        - creditsPerYear
+    Tier:
+      allOf:
+        - $ref: "#/components/schemas/TierCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+    UsageJob:
+      type: object
+      properties:
+        id:
+          type: integer
+      required:
+        - id

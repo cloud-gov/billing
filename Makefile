@@ -65,7 +65,7 @@ watch-setup:
 watchgen: watch-setup
 	@echo "Watching for .sql file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
-		find . -type f -name '*.sql' | entr -d make gen ; \
+		find . -type f \( -name '*.sql' -o -name 'openapi.yaml' -o -name 'oapi-codegen.yaml' \)  | entr -d make gen ; \
 		sleep 0.5 ; \
 	done
 
