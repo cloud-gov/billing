@@ -28,3 +28,20 @@ from
   ) as rn (customer_id, slug, path, resource_natural_id)
 on conflict (customer_id, resource_natural_id) do update
   set slug = excluded.slug, path = excluded.path;
+
+-- name: GetAppsUsageBySpace :many
+select
+  subpath(rn.path, 1, -2) as org,
+  regexp_replace(
+    subpath(rn.path, 1, -1)::text,
+    '_?(test|dev|stage|staging|prod)$', -- to aggregate environments
+    ''
+  ) as space,
+  sum(m.amount_microcredits) as total_microcredits,
+  sum(m.amount_microcredits) / 1000000 as total_credits
+from resource_node as rn
+  inner join measurement as m on rn.resource_natural_id = m.resource_natural_id
+where
+  rn.customer_id = $1
+  and rn.path ~ 'apps.usage.cforg%.space%.*{1,}'
+group by org, space;

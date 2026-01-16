@@ -43,6 +43,56 @@ func (q *Queries) BulkCreateResourceNodes(ctx context.Context, arg BulkCreateRes
 	return err
 }
 
+const getAppsUsageBySpace = `-- name: GetAppsUsageBySpace :many
+select
+  subpath(rn.path, 1, -2) as org,
+  regexp_replace(
+    subpath(rn.path, 1, -1)::text,
+    '_?(test|dev|stage|staging|prod)$', -- to aggregate environments
+    ''
+  ) as space,
+  sum(m.amount_microcredits) as total_microcredits,
+  sum(m.amount_microcredits) / 1000000 as total_credits
+from resource_node as rn
+  inner join measurement as m on rn.resource_natural_id = m.resource_natural_id
+where
+  rn.customer_id = $1
+  and rn.path ~ 'apps.usage.cforg%.space%.*{1,}'
+group by org, space
+`
+
+type GetAppsUsageBySpaceRow struct {
+	Org               string
+	Space             string
+	TotalMicrocredits pgtype.Numeric
+	TotalCredits      pgtype.Numeric
+}
+
+func (q *Queries) GetAppsUsageBySpace(ctx context.Context, customerID pgtype.UUID) ([]GetAppsUsageBySpaceRow, error) {
+	rows, err := q.db.Query(ctx, getAppsUsageBySpace, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAppsUsageBySpaceRow
+	for rows.Next() {
+		var i GetAppsUsageBySpaceRow
+		if err := rows.Scan(
+			&i.Org,
+			&i.Space,
+			&i.TotalMicrocredits,
+			&i.TotalCredits,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getResourceNode = `-- name: GetResourceNode :one
 /*
 We can have ambiguous columns because sqlc handles it
@@ -55,7 +105,7 @@ where customer_id = $1 and slug = $2
 
 type GetResourceNodeParams struct {
 	CustomerID pgtype.UUID
-	Slug       string
+	Slug       pgtype.Text
 }
 
 func (q *Queries) GetResourceNode(ctx context.Context, arg GetResourceNodeParams) (ResourceNode, error) {
