@@ -18,7 +18,8 @@ create table resource_node (
   slug                varchar(256),
   customer_id         uuid references customer (id),
   resource_natural_id text,
-  constraint resource_node_pkey primary key (customer_id, slug)
+  constraint resource_node_pkey primary key (customer_id, resource_natural_id),
+  constraint resource_node_slug_uq unique (customer_id, slug)
 );
 
 --
