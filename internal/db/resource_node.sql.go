@@ -21,7 +21,8 @@ from
     $3::ltree[],
     $4::text[]
   ) as rn (customer_id, slug, path, resource_natural_id)
-on conflict (customer_id, slug) do nothing
+on conflict (customer_id, resource_natural_id) do update
+  set slug = excluded.slug, path = excluded.path
 `
 
 type BulkCreateResourceNodesParams struct {

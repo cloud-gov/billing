@@ -145,9 +145,9 @@ type ResourceKind struct {
 
 type ResourceNode struct {
 	Path              pgtype.Text
-	Slug              string
+	Slug              pgtype.Text
 	CustomerID        pgtype.UUID
-	ResourceNaturalID pgtype.Text
+	ResourceNaturalID string
 }
 
 type Tier struct {
