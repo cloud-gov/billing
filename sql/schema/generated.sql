@@ -1,5 +1,5 @@
 
-\restrict 5KeQDKZkag9opgx1ecJTKLdzQYoRnVSixeJi9OyUMrb8Fng3AiapVi0d94ggfJ0
+\restrict LwrDFnwEbjalZALG3oW9zk7ZZbAYwslc4WYPM1KHqIfmULhmp7WCUaLAtmuCeWT
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -415,9 +415,9 @@ COMMENT ON TABLE public.resource_kind IS 'ResourceKind represents a particular k
 
 CREATE TABLE public.resource_node (
     path public.ltree,
-    slug character varying(256) NOT NULL,
+    slug character varying(256),
     customer_id uuid NOT NULL,
-    resource_natural_id text,
+    resource_natural_id text NOT NULL,
     CONSTRAINT valid_path CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text))
 );
 
@@ -506,7 +506,10 @@ ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_meter_natural_id_uq UNIQUE (meter, natural_id);
 
 ALTER TABLE ONLY public.resource_node
-    ADD CONSTRAINT resource_node_pkey PRIMARY KEY (customer_id, slug);
+    ADD CONSTRAINT resource_node_pkey PRIMARY KEY (customer_id, resource_natural_id);
+
+ALTER TABLE ONLY public.resource_node
+    ADD CONSTRAINT resource_node_slug_uq UNIQUE (customer_id, slug);
 
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_pkey PRIMARY KEY (meter, natural_id);
@@ -551,7 +554,7 @@ CREATE INDEX reading_created_at_utc_idx ON public.reading USING btree (created_a
 
 CREATE UNIQUE INDEX reading_hourly_uq ON public.reading USING btree (date_trunc('hour'::text, created_at));
 
-CREATE INDEX resource_path_gist_idx ON public.resource_node USING gist (path);
+COMMENT ON INDEX public.reading_hourly_uq IS 'Make readings unique per hour.';
 
 CREATE INDEX resource_cf_org_id_idx ON public.resource USING btree (cf_org_id);
 
@@ -606,5 +609,5 @@ ALTER TABLE ONLY public.account
 ALTER TABLE ONLY public.resource_node
     ADD CONSTRAINT resource_node_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
-\unrestrict 5KeQDKZkag9opgx1ecJTKLdzQYoRnVSixeJi9OyUMrb8Fng3AiapVi0d94ggfJ0
+\unrestrict LwrDFnwEbjalZALG3oW9zk7ZZbAYwslc4WYPM1KHqIfmULhmp7WCUaLAtmuCeWT
 
