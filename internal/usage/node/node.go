@@ -38,7 +38,7 @@ func WithSlugAuto(slugParts ...string) NodeOpt {
 				b.WriteString("_")
 			}
 			s = strings.ReplaceAll(s, ".", "_")
-			s = saniSlugExpr.ReplaceAllString(s, "")
+			s = saniSlugExpr.ReplaceAllString(s, "_")
 			b.WriteString(s)
 		}
 		n.Slug = b.String()
@@ -54,7 +54,7 @@ func WithPathAuto(pathParts ...string) NodeOpt {
 			if i > 0 {
 				b.WriteString(".")
 			}
-			b.WriteString(saniPathExpr.ReplaceAllString(s, ""))
+			b.WriteString(saniPathExpr.ReplaceAllString(s, "_"))
 		}
 		if n.Slug == "" {
 			return ErrPathSlugless
