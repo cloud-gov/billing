@@ -22,12 +22,12 @@ type ServiceMeterDB interface {
 // CFServiceMeter reads usage from Cloud Foundry service instances.
 type CFServiceMeter struct {
 	logger *slog.Logger
-	client ServiceClient
+	client ServiceMeterCfProvider
 	dbq    ServiceMeterDB
 }
 
 func NewCFServiceMeter(
-	logger *slog.Logger, client ServiceClient, dbq ServiceMeterDB,
+	logger *slog.Logger, client ServiceMeterCfProvider, dbq ServiceMeterDB,
 ) *CFServiceMeter {
 	return &CFServiceMeter{
 		logger: logger.WithGroup("CFServiceMeter"),

@@ -31,12 +31,12 @@ type AppMeterDB interface {
 
 type CFAppMeter struct {
 	logger *slog.Logger
-	client AppClient
+	client AppMeterCfProvider
 	dbq    AppMeterDB
 }
 
 func NewCFAppMeter(
-	logger *slog.Logger, client AppClient, dbq AppMeterDB,
+	logger *slog.Logger, client AppMeterCfProvider, dbq AppMeterDB,
 ) *CFAppMeter {
 	return &CFAppMeter{
 		logger: logger.WithGroup("CFAppMeter"),
