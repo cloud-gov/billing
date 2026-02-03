@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/usage/node"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
@@ -85,7 +86,6 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
 		}
 
-		cfOrgGUID := ""
 		spaceGUID := app.Relationships.Space.Data.GUID
 
 		sidx := slices.IndexFunc(spaces, func(s *resource.Space) bool {
@@ -105,24 +105,21 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 
 			nodes = append(nodes, []*node.Node{appNode}...)
 		} else {
-			cfOrgGUID = spaces[sidx].Relationships.Organization.Data.GUID
-			orgIDParsed := pgtype.UUID{}
-			if err := orgIDParsed.Scan(cfOrgGUID); err != nil {
-				return nil, nil, err
-			}
+			cfOrgGUIDString := spaces[sidx].Relationships.Organization.Data.GUID
+			cfOrgGUID := dbx.UtilUUID(cfOrgGUIDString)
 
-			org, err := m.dbq.GetCFOrg(ctx, orgIDParsed)
+			org, err := m.dbq.GetCFOrg(ctx, cfOrgGUID)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				return nil, nil, err
 			}
 
 			customerID := org.CustomerID
 			msrmt.CustomerID = customerID
-			msrmt.OrgID = cfOrgGUID
+			msrmt.OrgID = cfOrgGUIDString
 
 			cfOrgNode, err := node.New(
 				customerID,
-				cfOrgGUID,
+				cfOrgGUIDString,
 				node.WithSlugAuto("cforg", org.Name.String),
 				node.WithPathAuto("apps.usage"),
 			)

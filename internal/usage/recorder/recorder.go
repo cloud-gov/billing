@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
 
@@ -22,7 +22,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	logger.Debug("creating reading in database")
 
 	dbReading, err := q.CreateUniqueReading(ctx, db.CreateUniqueReadingParams{
-		CreatedAt: pgxTimestamp(r.Time),
+		CreatedAt: dbx.UtilTimestamp(r.Time),
 		Periodic:  periodic,
 	})
 	if err != nil {
@@ -51,10 +51,10 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 
 		// We may insert thousands of rows at a time. We only want to insert if a row does not already exist. COPY does not support ON CONFLICT, running an INSERT in a loop is inefficient, and sqlc does not support variable-length INSERTs. As a workaround we write INSERT queries that accept arrays, with one array per column where appropriate.
 		dbMeters = append(dbMeters, m.Meter)
-		dbCFOrgs = append(dbCFOrgs, pgxUUID(m.OrgID))
+		dbCFOrgs = append(dbCFOrgs, dbx.UtilUUID(m.OrgID))
 		dbKinds.Meters = append(dbKinds.Meters, m.Meter)
 		dbKinds.NaturalIds = append(dbKinds.NaturalIds, m.ResourceKindNaturalID)
-		dbResources.CfOrgIds = append(dbResources.CfOrgIds, pgxUUID(m.OrgID))
+		dbResources.CfOrgIds = append(dbResources.CfOrgIds, dbx.UtilUUID(m.OrgID))
 		dbResources.KindNaturalIds = append(dbResources.KindNaturalIds, m.ResourceKindNaturalID)
 		dbResources.Meters = append(dbResources.Meters, m.Meter)
 		dbResources.NaturalIds = append(dbResources.NaturalIds, m.ResourceNaturalID)
@@ -108,29 +108,4 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	}
 	logger.Debug("created measurements")
 	return err
-}
-
-func pgxUUID(s any) pgtype.UUID {
-	switch s := s.(type) {
-	case pgtype.UUID:
-		return s
-	case nil:
-		return pgtype.UUID{}
-	case string:
-		if s == "" {
-			return pgtype.UUID{}
-		}
-	}
-	u := pgtype.UUID{}
-	if err := u.Scan(s); err != nil {
-		panic(fmt.Errorf("failed to convert `%#v` to UUID: %w", s, err))
-	}
-	return u
-}
-
-func pgxTimestamp(t time.Time) pgtype.Timestamp {
-	return pgtype.Timestamp{
-		Time:  t,
-		Valid: true,
-	}
 }

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -73,16 +74,7 @@ func WithPathByParent(parent *Node) NodeOpt {
 func New(customerID any, resourceID string, opts ...NodeOpt) (*Node, error) {
 	n := &Node{ResourceNaturalID: resourceID}
 
-	if customerID, ok := customerID.(pgtype.UUID); !ok {
-		u := pgtype.UUID{}
-		if err := u.Scan(customerID); err != nil {
-			return nil, err
-		}
-		n.CustomerID = u
-	} else {
-		n.CustomerID = customerID
-	}
-
+	n.CustomerID = dbx.UtilUUID(customerID)
 	if !n.CustomerID.Valid {
 		err := n.CustomerID.Scan("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")
 		if err != nil {

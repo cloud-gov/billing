@@ -18,6 +18,7 @@ import (
 	"github.com/cloud-gov/billing/internal/api/middleware"
 	"github.com/cloud-gov/billing/internal/config"
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/jobs"
 )
 
@@ -102,7 +103,7 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 			NaturalID:     app.GUID,
 			Meter:         "oneoff",
 			KindNaturalID: "",
-			CFOrgID:       pgxUUID(space.Relationships.Organization.Data.GUID),
+			CFOrgID:       dbx.UtilUUID(space.Relationships.Organization.Data.GUID),
 		})
 		if err != nil {
 			http.Error(w, "upserting resource: "+err.Error(), http.StatusInternalServerError)
@@ -123,10 +124,4 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 		}
 		_, _ = io.WriteString(w, "Created reading.\n")
 	})
-}
-
-func pgxUUID(s string) pgtype.UUID {
-	u := pgtype.UUID{}
-	u.Scan(s)
-	return u
 }
