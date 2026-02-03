@@ -8,7 +8,6 @@ import (
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 
-	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/usage/meter"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
@@ -90,7 +89,7 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 		app1 = "app‑1"
 		app2 = "app‑2"
 		sp   = "space‑1"
-		org  = "org‑1"
+		org  = "10000000-0000-0000-0000-000000000001"
 	)
 
 	hugeInstances := 1024
@@ -202,9 +201,14 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 				}
 			}()
 
-			customers := []db.Customer{{}}
-
-			sut := meter.NewCFAppMeter(slog.Default(), customers, &MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
+			sut := meter.NewCFAppMeter(
+				slog.Default(),
+				&MockAppMeterCfProvider{
+					Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr,
+					Processes: tc.procs, ProcErr: tc.procErr,
+				},
+				&StubDbQ{},
+			)
 
 			got, _, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {

@@ -6,25 +6,12 @@ import (
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 
-	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/usage/meter"
 )
 
-type mockClient struct {
-	Spaces           *MockSpaceClient
-	ServiceInstances *MockServiceInstanceClient
-	ServicePlans     *MockServicePlanClient
-	ServiceOfferings *MockServiceOfferingClient
-}
-
 func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	// arrange
-	client := mockClient{
-		Spaces:           NewMockSpaceClient(),
-		ServiceInstances: NewMockServiceInstanceClient(),
-		ServicePlans:     NewMockServicePlanClient(),
-		ServiceOfferings: NewMockServiceOfferingClient(),
-	}
+	cfProvider := NewMockServiceMeterCfProvider()
 
 	offeringID := newUUID()
 	planID := newUUID()
@@ -32,13 +19,13 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	spaceID := newUUID()
 	instanceID := newUUID()
 
-	client.ServiceOfferings.Data = append(client.ServiceOfferings.Data, &resource.ServiceOffering{
+	cfProvider.Offerings = append(cfProvider.Offerings, &resource.ServiceOffering{
 		Resource: resource.Resource{
 			GUID: offeringID,
 		},
 	})
 
-	client.ServicePlans.Data = append(client.ServicePlans.Data, &resource.ServicePlan{
+	cfProvider.Plans = append(cfProvider.Plans, &resource.ServicePlan{
 		Resource: resource.Resource{
 			GUID: planID,
 		},
@@ -51,7 +38,7 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 		},
 	})
 
-	client.Spaces.Data = append(client.Spaces.Data, &resource.Space{
+	cfProvider.Spaces = append(cfProvider.Spaces, &resource.Space{
 		Resource: resource.Resource{
 			GUID: spaceID,
 		},
@@ -64,7 +51,7 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 		},
 	})
 
-	client.ServiceInstances.Data = append(client.ServiceInstances.Data, &resource.ServiceInstance{
+	cfProvider.Instances = append(cfProvider.Instances, &resource.ServiceInstance{
 		Resource: resource.Resource{
 			GUID: instanceID,
 		},
@@ -82,9 +69,7 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 		},
 	})
 
-	customers := []db.Customer{{}}
-
-	sut := meter.NewCFServiceMeter(slog.Default(), customers, client)
+	sut := meter.NewCFServiceMeter(slog.Default(), cfProvider, &StubDbQ{})
 
 	// act
 	readings, _, err := sut.ReadUsage(t.Context())
