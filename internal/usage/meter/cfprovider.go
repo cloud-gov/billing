@@ -7,15 +7,22 @@ import (
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 )
 
-type AppClient interface {
+type AppMeterCfProvider interface {
 	Apps
 	Processes
 }
 
-type ServiceClient interface {
+type ServiceMeterCfProvider interface {
 	Spaces
 	ServiceInstances
 	ServicePlans
+}
+
+type Apps interface {
+	AppsListWithSpaces(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, error)
+}
+type Processes interface {
+	ProcessesList(context.Context, *client.ProcessListOptions) ([]*resource.Process, error)
 }
 
 type Spaces interface {
@@ -26,12 +33,6 @@ type ServiceInstances interface {
 }
 type ServicePlans interface {
 	ServicePlansOfferingsList(context.Context, *client.ServicePlanListOptions) ([]*resource.ServicePlan, []*resource.ServiceOffering, error)
-}
-type Processes interface {
-	ProcessesList(context.Context, *client.ProcessListOptions) ([]*resource.Process, error)
-}
-type Apps interface {
-	AppsListWithSpaces(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, error)
 }
 
 type CFAdapter struct {
