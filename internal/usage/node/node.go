@@ -3,6 +3,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -84,7 +85,7 @@ func New(customerID any, resourceID string, opts ...NodeOpt) (*Node, error) {
 
 	for _, o := range opts {
 		if err := o(n); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("new node: opts: %w", err)
 		}
 	}
 	return n, nil

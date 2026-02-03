@@ -3,6 +3,7 @@ package meter
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 
@@ -52,14 +53,14 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 	m.logger.DebugContext(ctx, "app meter: listing processes")
 	procs, err := m.client.ProcessesList(ctx, client.NewProcessOptions())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ReadUsage: listing processes: %w", err)
 	}
 
 	m.logger.DebugContext(ctx, "app meter: listing apps")
 	appOpts := client.NewAppListOptions() // For fast troubleshooting, set .GUIDs to an app GUID.
 	apps, spaces, err := m.client.AppsListWithSpaces(ctx, appOpts)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ReadUsage: listing apps w/ spaces: %w", err)
 	}
 
 	measurements := []reader.Measurement{}
@@ -100,7 +101,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 				node.WithPathAuto("orphan"),
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("ReadUsage: creating orphan app node: %w", err)
 			}
 
 			nodes = append(nodes, []*node.Node{appNode}...)
@@ -110,7 +111,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 
 			org, err := m.dbq.GetCFOrg(ctx, cfOrgGUID)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("ReadUsage: getting org: %w", err)
 			}
 
 			customerID := org.CustomerID
@@ -124,7 +125,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 				node.WithPathAuto("apps.usage"),
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("ReadUsage: creating org node: %w", err)
 			}
 
 			spaceNode, err := node.New(
@@ -134,7 +135,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 				node.WithPathByParent(cfOrgNode),
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("ReadUsage: creating space node: %w", err)
 			}
 
 			appNode, err := node.New(
@@ -144,7 +145,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 				node.WithPathByParent(spaceNode),
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("ReadUsage: creating app node: %w", err)
 			}
 
 			nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, appNode}...)
