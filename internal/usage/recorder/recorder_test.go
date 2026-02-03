@@ -94,7 +94,7 @@ func (s *stubQuerier) BulkCreateMeasurement(_ context.Context, arg db.BulkCreate
 
 func (s *stubQuerier) BulkCreateResourceNodes(_ context.Context, arg db.BulkCreateResourceNodesParams) error {
 	if s.errOn == "BulkCreateResourceNodes" {
-		return ExpectedErr
+		return ErrExpected
 	}
 	s.bulkRNodes = arg
 	return nil
@@ -177,6 +177,10 @@ func (s *stubQuerier) GetCustomer(_ context.Context, id pgtype.UUID) (db.Custome
 }
 
 func (s *stubQuerier) GetAccountForCustomerAndType(_ context.Context, arg db.GetAccountForCustomerAndTypeParams) (db.Account, error) {
+	panic("unimplemented")
+}
+
+func (s *stubQuerier) GetAppsUsageBySpace(_ context.Context, customerID pgtype.UUID) ([]db.GetAppsUsageBySpaceRow, error) {
 	panic("unimplemented")
 }
 
@@ -280,6 +284,14 @@ func (s *stubQuerier) UpsertResource(_ context.Context, arg db.UpsertResourcePar
 	panic("unimplemented")
 }
 
+type WantedErr int64
+
+const (
+	NotWanted WantedErr = iota
+	ErrWanted
+	PanicWanted
+)
+
 func TestRecordReading(t *testing.T) {
 	goodM := reader.Measurement{
 		Meter:                 "cpu",
@@ -294,14 +306,14 @@ func TestRecordReading(t *testing.T) {
 		name       string
 		reading    reader.Reading
 		errOn      string // make stubQuerier fail on this step ("" == happy path)
-		wantErr    bool
+		wantErr    WantedErr
 		wantMeters int // how many meter strings the stub should record
 	}{
 		{
 			"no measurements",
 			reader.Reading{Time: time.Now()},
 			"",
-			false,
+			NotWanted,
 			0,
 		},
 		{
@@ -311,7 +323,7 @@ func TestRecordReading(t *testing.T) {
 				Measurements: []reader.Measurement{emptyM},
 			},
 			"",
-			false,
+			NotWanted,
 			0,
 		},
 		{
@@ -321,7 +333,7 @@ func TestRecordReading(t *testing.T) {
 				Measurements: []reader.Measurement{goodM, emptyM},
 			},
 			"",
-			false,
+			NotWanted,
 			1,
 		},
 		{
@@ -331,7 +343,7 @@ func TestRecordReading(t *testing.T) {
 				Measurements: []reader.Measurement{goodM, goodM},
 			},
 			"",
-			false,
+			NotWanted,
 			2, // deduplication is done in the database; not tested here
 		},
 		{
@@ -349,7 +361,7 @@ func TestRecordReading(t *testing.T) {
 				},
 			},
 			"",
-			false,
+			NotWanted,
 			1,
 		},
 		{
@@ -367,7 +379,7 @@ func TestRecordReading(t *testing.T) {
 				},
 			},
 			"",
-			false,
+			NotWanted,
 			1,
 		},
 		{
@@ -385,7 +397,7 @@ func TestRecordReading(t *testing.T) {
 				},
 			},
 			"BulkCreateCFOrgs",
-			true,
+			PanicWanted,
 			1,
 		},
 		{
@@ -395,7 +407,7 @@ func TestRecordReading(t *testing.T) {
 				Measurements: []reader.Measurement{goodM},
 			},
 			"",
-			false,
+			NotWanted,
 			1,
 		},
 		{
@@ -405,7 +417,7 @@ func TestRecordReading(t *testing.T) {
 				Measurements: []reader.Measurement{goodM},
 			},
 			"BulkCreateResources",
-			true,
+			ErrWanted,
 			1,
 		},
 	}
@@ -414,13 +426,21 @@ func TestRecordReading(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					if tc.wantErr != PanicWanted {
+						panic(r)
+					}
+				}
+			}()
+
 			stub := &stubQuerier{errOn: tc.errOn}
 			err := recorder.RecordReading(t.Context(), nullLogger, stub, tc.reading, false)
 
-			if tc.wantErr && err == nil {
+			if tc.wantErr > NotWanted && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
-			if !tc.wantErr && err != nil {
+			if tc.wantErr != ErrWanted && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if got := len(stub.bulkMeters); got != tc.wantMeters {
