@@ -1,3 +1,4 @@
+// Package api is the billing service REST API
 package api
 
 import (
