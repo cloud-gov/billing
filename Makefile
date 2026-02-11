@@ -1,6 +1,12 @@
 # Use bash so we can use `source`.
 SHELL := /bin/bash
 
+# Source docker.env if it exists and export all valid keys
+ifneq ("$(wildcard docker.env)", "")
+	include docker.env
+	export $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' docker.env)
+endif
+
 .PHONY: db-up
 db-up:
 	docker compose up --detach --wait db
@@ -27,30 +33,29 @@ test: gen
 
 .PHONY: debug
 debug: gen
-	@set -a; source docker.env; set +a; dlv debug
+	@dlv debug
 
-.PHONY: debug-test
+
+.PHONY: debug-test-db
+debug-test-db: export PGDATABASE = postgres
+debug-test-db: export PGPORT = 5433
 debug-test-db:
 	@# Equivalent to `make db-up` and `make db-down`, but for the ephemeral database
 	@docker compose down --volumes test-db-ephemeral
 	@docker compose up --detach --wait test-db-ephemeral
 
 	@# Equivalent to `make db-init`, but for the ephemeral database
-	@set -a; source docker.env; PGDATABASE=postgres PGPORT=5433; set +a; \
-	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool river migrate-up
+	@go tool river migrate-up
 
 	@echo "Running database tests (TestDB*)..."
 	@# Edit and use like: dlv test ./internal/dbx -- -test.run TestDBPostUsage
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	dlv test ./internal/dbx -- -test.run TestDBPostUsage
+	@dlv test ./internal/dbx -- -test.run TestDBPostUsage
 
 .PHONY: watch-setup
 watch-setup:
@@ -75,7 +80,6 @@ watchgen: watch-setup
 watch: watch-setup
 	@echo "Watching for .go file changes. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
-		set -a; source docker.env; set +a; \
 		find . -type f -name '*.go' \
 		| entr -d -r go run . ; \
 		sleep 0.5 ; \
@@ -86,7 +90,7 @@ watchtest: watch-setup
 	@echo "Running unit tests every time .go files change. Press ctrl+c *twice* to exit, or once to rebuild."
 	@while true; do \
 		sleep 0.5 ; \
-		set -a; source docker.env; set +a; find . -type f -name '*.go' | entr -d go test ./... ; \
+		find . -type f -name '*.go' | entr -d go test ./... ; \
 	done
 
 .PHONY: clean
@@ -94,31 +98,28 @@ clean: db-down
 	go clean
 
 .PHONY: db-init
+db-init: export PGDATABASE = postgres
 db-init:
 	@# Initialize the database.
-	@set -a; source docker.env; PGDATABASE=postgres; set +a; \
-	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 .PHONY: db-drop
+db-drop: export PGDATABASE = postgres
 db-drop:
 	@# Drop the database.
-	@set -a; source docker.env; PGDATABASE=postgres; set +a; \
-	go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
+	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init --destination 0
 
 .PHONY: db-migrate
 db-migrate: db-init
 	@# Migrate to the latest migration.
-	@set -a; source docker.env; set +a; \
-	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@set -a; source docker.env; set +a; \
-	go tool river migrate-up
+	@go tool river migrate-up
 
 .PHONY: db-remigrate
 db-remigrate: db-init
 	@# Redo the latest migration in Tern.
-	@set -a; source docker.env; set +a; \
-	go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
+	@go tool tern migrate -d -+1 --config sql/migrations/tern.conf --migrations sql/migrations
 
 .PHONY: db-reset
 db-reset: db-drop db-init db-migrate
@@ -126,41 +127,40 @@ db-reset: db-drop db-init db-migrate
 
 .PHONY: psql
 psql:
-	@set -a; source docker.env; set +a; psql
+	@psql
 
 .PHONY: psql-testdb
+psql-testdb: export PGPORT = 5433
 psql-testdb:
-	@set -a; source docker.env; PGPORT=5433; set +a; psql
+	psql
 
 .PHONY: db-schema
 db-schema:
-	@set -a; source docker.env; set +a; \
+	@\
 	pg_dump --schema-only --exclude-table='river*' --exclude-table="schema_version" --no-owner \
 	| grep --invert-match "\-\-" \
 	| cat -s \
 	> sql/schema/generated.sql
 
 .PHONY: test-db
+test-db: export PGDATABASE = postgres
+test-db: export PGPORT = 5433
 test-db:
 	@# Equivalent to `make db-up` and `make db-down`, but for the ephemeral database
 	@docker compose down --volumes test-db-ephemeral
 	@docker compose up --detach --wait test-db-ephemeral
 
 	@# Equivalent to `make db-init`, but for the ephemeral database
-	@set -a; source docker.env; PGDATABASE=postgres PGPORT=5433; set +a; \
-	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
+	@go tool tern migrate --config sql/migrations/tern.conf --migrations sql/migrations
 	@# Migrate River schema to latest.
-	@set -a; source docker.env; PGPORT=5433; set +a; \
-	go tool river migrate-up
+	@go tool river migrate-up
 
 	@echo "Running database tests (TestDB*)..."
 	@# Disable caching with -count=1, since go does not cache bust when .sql files change
-	@set -a; source docker.env; PGPORT=5433; set +a; \
 	go test ./... -run TestDB -count=1
 
 # Run from inside a container.
