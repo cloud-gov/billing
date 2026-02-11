@@ -2,6 +2,8 @@
 
 The billing service tracks customer usage of Cloud.gov products for billing purposes.
 
+More docs: [DB Schema](./docs/db-schema) | [System Diagrams](./docs/diagrams) | [Architectural Decision Records](./docs/ADRs)
+
 ## Development
 
 Prerequisite: Docker must be installed and running.
@@ -57,6 +59,16 @@ Connect to the database in a CF environment with [cf-service-connect](https://gi
 
 ```sh
 cf connect-to-service billing billing-db
+```
+
+#### Schema documentation
+
+Detailed schema documentation including entity-relationship diagrams (ERD) can be found in [docs/db-schema](./docs/db-schema).
+
+These docs are automatically generated with [`tbls`](https://github.com/k1LoW/tbls) like so:
+
+```sh
+make db-docs-gen
 ```
 
 ### Dependencies
