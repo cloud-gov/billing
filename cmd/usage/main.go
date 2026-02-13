@@ -14,6 +14,7 @@ import (
 	"github.com/cloud-gov/billing/internal/config"
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbx"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,7 +45,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&cid, "cid", "$CG_USAGE_CUSTOMER_ID", "Narrow scope to Customer by ID")
+	flag.StringVar(&cid, "cid", "", "Narrow scope to Customer by ID, falls back to $CG_USAGE_CUSTOMER_ID if neither -cid or -cname defined")
 	flag.StringVar(&cname, "cname", "", "Narrow results to Customer by name")
 	flag.StringVar(&lquery, "lq", "", "Provide an `lquery` to search with; supercedes org & space")
 	flag.StringVar(&org, "org", "", "Filter by org name")
@@ -52,15 +53,18 @@ func init() {
 	flag.Parse()
 }
 
-func getNodes(ctx context.Context, q db.Querier, query, customerID string) ([]db.GetUsageByPathRow, error) {
-	return q.GetUsageByPath(ctx, db.GetUsageByPathParams{
-		Path:       query,
-		CustomerID: dbx.UtilUUID(customerID),
-	})
-}
-
 // func getMeasures(ctx context.Context, q db.Querier, nodes []db.ResourceNode) ([]db.Measurement, error) {
 // }
+
+func main() {
+	ctx := context.Background()
+	out := os.Stdout
+	err := run(ctx, out)
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+}
 
 func run(ctx context.Context, out io.Writer) error {
 	c, err := config.New()
@@ -80,45 +84,15 @@ func run(ctx context.Context, out io.Writer) error {
 
 	q := dbx.NewQuerier(db.New(conn))
 
-	var customerID string
-	if cid == "" && cname == "" {
-		customerID = os.Getenv("CG_USAGE_CUSTOMER_ID")
-	} else if cid != "" {
-		customerID = cid
-	} else if cname != "" {
-		cs, err := q.GetCustomersByName(ctx, cname)
-		if err != nil {
-			return fmtErr(ErrGetCustomer, err)
-		}
-		if len(cs) > 1 {
-			return fmt.Errorf("got more than one customer for '%v'", cname)
-		}
-		customerID = cs[0].ID.String()
-	} else {
-		panic("uh oh… no customer")
+	customerID, err := getCustomerID(ctx, q)
+	if err != nil {
+		return err
 	}
 
-	nodeQuery := strings.Builder{}
-	nodeQuery.WriteString("apps.usage")
-	if lquery != "" {
-		nodeQuery.WriteString(lquery)
-	} else {
-		if org != "" {
-			fmt.Fprintf(&nodeQuery, ".cforg_%v%%", org)
-		} else {
-			nodeQuery.WriteString(".cforg_%")
-		}
-		if space != "" {
-			fmt.Fprintf(&nodeQuery, ".space_%v%%", space)
-		} else {
-			nodeQuery.WriteString(".space_%")
-		}
+	nodeQuery := buildQuery()
 
-		nodeQuery.WriteString(".*{1,}")
-	}
-
-	logger.Debug("run: getting usage", "customerID", customerID, "query", nodeQuery.String())
-	n, err := getNodes(ctx, q, nodeQuery.String(), customerID)
+	logger.Debug("run: getting usage", "customerID", customerID, "query", nodeQuery)
+	n, err := getNodes(ctx, q, nodeQuery, customerID)
 	if err != nil {
 		return fmtErr(ErrGettingNodes, err)
 	}
@@ -128,12 +102,62 @@ func run(ctx context.Context, out io.Writer) error {
 	return err
 }
 
-func main() {
-	ctx := context.Background()
-	out := os.Stdout
-	err := run(ctx, out)
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
+func getNodes(ctx context.Context, q db.Querier, query string, customerID pgtype.UUID) ([]db.GetUsageByPathRow, error) {
+	return q.GetUsageByPath(ctx, db.GetUsageByPathParams{
+		Path:       query,
+		CustomerID: customerID,
+	})
+}
+
+func buildQuery() string {
+	nodeQuery := strings.Builder{}
+	nodeQuery.WriteString("apps.usage")
+
+	if lquery != "" {
+		nodeQuery.WriteString(lquery)
+		return nodeQuery.String()
 	}
+
+	// L1
+	if org != "" {
+		fmt.Fprintf(&nodeQuery, ".cforg_%v%%", org)
+	} else {
+		nodeQuery.WriteString(".cforg_%")
+	}
+
+	// L2/3
+	if space != "" {
+		fmt.Fprintf(&nodeQuery, ".space_%v%%", space)
+	} else {
+		nodeQuery.WriteString(".space_%")
+	}
+
+	// Resources Leaves
+	nodeQuery.WriteString(".*{1,}")
+
+	return nodeQuery.String()
+}
+
+func getCustomerID(ctx context.Context, q dbx.Querier) (id pgtype.UUID, err error) {
+	r := getRawCID()
+	if r != "" {
+		return dbx.UtilUUID(r), nil
+	}
+
+	if cs, e := q.GetCustomersByName(ctx, cname); e != nil {
+		err = fmtErr(ErrGetCustomer, e)
+	} else if len(cs) > 1 {
+		err = fmt.Errorf("got more than one customer for '%v'", cname)
+	} else {
+		id = cs[0].ID
+	}
+
+	return id, err
+}
+
+func getRawCID() string {
+	if cid == "" && cname == "" { // only fallback to env no user input
+		return os.Getenv("CG_USAGE_CUSTOMER_ID")
+	}
+	return cid
 }
