@@ -2,6 +2,10 @@
 SELECT * FROM customer
 WHERE id = $1 LIMIT 1;
 
+-- name: GetCustomersByName :many
+SELECT * FROM customer
+WHERE name ~* $1;
+
 -- name: ListCustomers :many
 SELECT * FROM customer
 ORDER BY name;

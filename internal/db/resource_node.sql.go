@@ -120,13 +120,80 @@ func (q *Queries) GetResourceNode(ctx context.Context, arg GetResourceNodeParams
 	return i, err
 }
 
-const listAncestors = `-- name: ListAncestors :many
-select path, slug, customer_id, resource_natural_id from resource_node
-where path @> subpath($1::ltree, -1)
+const getUsageByPath = `-- name: GetUsageByPath :many
+select
+  coalesce(subltree(rn.path, 2, 3)::text, '') as l1,
+  coalesce(regexp_replace(
+    subltree(rn.path, 3, 4)::text,
+    '^(.*)_.*$', -- to aggregate environments
+    '\1'
+  )::text, '') as l2,
+  coalesce(subpath(rn.path, 3, -1)::text, '') as l3,
+  sum(m.amount_microcredits) as total_microcredits,
+  round(sum(m.amount_microcredits) * 1e-6, 3) as total_credits,
+  round(sum(m.amount_microcredits) * 1e-6 * 50, 2) as total_cost
+from resource_node as rn
+  inner join measurement as m on rn.resource_natural_id = m.resource_natural_id
+where
+  rn.customer_id = $1
+  and rn.path ~ $2::lquery
+group by rollup (l1, l2, l3)
+order by l1
 `
 
-func (q *Queries) ListAncestors(ctx context.Context, path string) ([]ResourceNode, error) {
-	rows, err := q.db.Query(ctx, listAncestors, path)
+type GetUsageByPathParams struct {
+	CustomerID pgtype.UUID
+	Path       string
+}
+
+type GetUsageByPathRow struct {
+	L1                pgtype.Text
+	L2                pgtype.Text
+	L3                pgtype.Text
+	TotalMicrocredits pgtype.Numeric
+	TotalCredits      pgtype.Numeric
+	TotalCost         pgtype.Numeric
+}
+
+func (q *Queries) GetUsageByPath(ctx context.Context, arg GetUsageByPathParams) ([]GetUsageByPathRow, error) {
+	rows, err := q.db.Query(ctx, getUsageByPath, arg.CustomerID, arg.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsageByPathRow
+	for rows.Next() {
+		var i GetUsageByPathRow
+		if err := rows.Scan(
+			&i.L1,
+			&i.L2,
+			&i.L3,
+			&i.TotalMicrocredits,
+			&i.TotalCredits,
+			&i.TotalCost,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lQueryResourceNodes = `-- name: LQueryResourceNodes :many
+select path, slug, customer_id, resource_natural_id from resource_node
+where customer_id = $1 and path ~ $2::lquery
+`
+
+type LQueryResourceNodesParams struct {
+	CustomerID pgtype.UUID
+	Path       string
+}
+
+func (q *Queries) LQueryResourceNodes(ctx context.Context, arg LQueryResourceNodesParams) ([]ResourceNode, error) {
+	rows, err := q.db.Query(ctx, lQueryResourceNodes, arg.CustomerID, arg.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -150,13 +217,43 @@ func (q *Queries) ListAncestors(ctx context.Context, path string) ([]ResourceNod
 	return items, nil
 }
 
-const listDescendants = `-- name: ListDescendants :many
+const listResourceNodeAncestors = `-- name: ListResourceNodeAncestors :many
+select path, slug, customer_id, resource_natural_id from resource_node
+where path @> subpath($1::ltree, -1)
+`
+
+func (q *Queries) ListResourceNodeAncestors(ctx context.Context, path string) ([]ResourceNode, error) {
+	rows, err := q.db.Query(ctx, listResourceNodeAncestors, path)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ResourceNode
+	for rows.Next() {
+		var i ResourceNode
+		if err := rows.Scan(
+			&i.Path,
+			&i.Slug,
+			&i.CustomerID,
+			&i.ResourceNaturalID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listResourceNodeDescendants = `-- name: ListResourceNodeDescendants :many
 select path, slug, customer_id, resource_natural_id from resource_node
 where subpath(path, -1) <@ $1::ltree
 `
 
-func (q *Queries) ListDescendants(ctx context.Context, path string) ([]ResourceNode, error) {
-	rows, err := q.db.Query(ctx, listDescendants, path)
+func (q *Queries) ListResourceNodeDescendants(ctx context.Context, path string) ([]ResourceNode, error) {
+	rows, err := q.db.Query(ctx, listResourceNodeDescendants, path)
 	if err != nil {
 		return nil, err
 	}

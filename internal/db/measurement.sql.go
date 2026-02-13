@@ -12,8 +12,10 @@ import (
 )
 
 const boundsMonthPrev = `-- name: BoundsMonthPrev :one
-SELECT period_start, period_end
-FROM bounds_month_prev($1)
+SELECT
+  period_start,
+  period_end
+FROM BOUNDS_MONTH_PREV($1)
 `
 
 type BoundsMonthPrevRow struct {
@@ -31,17 +33,17 @@ func (q *Queries) BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) 
 
 const bulkCreateMeasurement = `-- name: BulkCreateMeasurement :exec
 INSERT INTO measurement (
-	reading_id,
-	meter,
-	resource_natural_id,
-	value
+  reading_id,
+  meter,
+  resource_natural_id,
+  value
 ) SELECT reading_id, meter, resource_natural_id, value FROM
-UNNEST (
-	$1::int[],
-	$2::text[],
-	$3::text[],
-	$4::int[]
-) AS m(reading_id, meter, resource_natural_id, value)
+  UNNEST(
+    $1::int[],
+    $2::text[],
+    $3::text[],
+    $4::int[]
+  ) AS m (reading_id, meter, resource_natural_id, value)
 `
 
 type BulkCreateMeasurementParams struct {
@@ -63,13 +65,13 @@ func (q *Queries) BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasu
 
 const createMeasurement = `-- name: CreateMeasurement :one
 INSERT INTO measurement (
-	reading_id,
-	meter,
-	resource_natural_id,
-	value,
-	amount_microcredits
+  reading_id,
+  meter,
+  resource_natural_id,
+  value,
+  amount_microcredits
 ) VALUES (
-	$1, $2, $3, $4, $5
+  $1, $2, $3, $4, $5
 ) RETURNING reading_id, meter, resource_natural_id, value, amount_microcredits, transaction_id, price_id
 `
 
@@ -144,7 +146,7 @@ func (q *Queries) ListMeasurements(ctx context.Context) ([]Measurement, error) {
 
 const postUsage = `-- name: PostUsage :many
 SELECT transaction_id
-FROM post_usage($1)
+FROM POST_USAGE($1)
 `
 
 func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]pgtype.Int4, error) {
@@ -169,7 +171,7 @@ func (q *Queries) PostUsage(ctx context.Context, asOf pgtype.Timestamptz) ([]pgt
 
 const updateMeasurementMicrocredits = `-- name: UpdateMeasurementMicrocredits :one
 SELECT update_measurement_microcredits
-FROM update_measurement_microcredits($1)
+FROM UPDATE_MEASUREMENT_MICROCREDITS($1)
 `
 
 // UpdateMeasurementMicrocredits updates the amount of microcredits associated with measurements made in the month preceding as_of based on the prices that were valid for each resource_kind at the time of reading.
