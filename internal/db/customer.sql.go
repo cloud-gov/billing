@@ -69,6 +69,38 @@ func (q *Queries) GetCustomer(ctx context.Context, id pgtype.UUID) (Customer, er
 	return i, err
 }
 
+const getCustomersByName = `-- name: GetCustomersByName :many
+SELECT old_id, name, tier_id, id, path, slug FROM customer
+WHERE name ~* $1
+`
+
+func (q *Queries) GetCustomersByName(ctx context.Context, name string) ([]Customer, error) {
+	rows, err := q.db.Query(ctx, getCustomersByName, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Customer
+	for rows.Next() {
+		var i Customer
+		if err := rows.Scan(
+			&i.OldID,
+			&i.Name,
+			&i.TierID,
+			&i.ID,
+			&i.Path,
+			&i.Slug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCustomers = `-- name: ListCustomers :many
 SELECT old_id, name, tier_id, id, path, slug FROM customer
 ORDER BY name
