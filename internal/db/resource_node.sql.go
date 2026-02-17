@@ -129,6 +129,7 @@ select
     '\1'
   )::text, '') as l2,
   coalesce(subpath(rn.path, 3, -1)::text, '') as l3,
+  coalesce(subpath(rn.path, 4)::text, '') as l4,
   sum(m.amount_microcredits) as total_microcredits,
   round(sum(m.amount_microcredits) * 1e-6, 3) as total_credits,
   round(sum(m.amount_microcredits) * 1e-6 * 50, 2) as total_cost
@@ -137,7 +138,7 @@ from resource_node as rn
 where
   rn.customer_id = $1
   and rn.path ~ $2::lquery
-group by rollup (l1, l2, l3)
+group by rollup (l1, l2, l3, l4)
 order by l1
 `
 
@@ -150,6 +151,7 @@ type GetUsageByPathRow struct {
 	L1                pgtype.Text
 	L2                pgtype.Text
 	L3                pgtype.Text
+	L4                pgtype.Text
 	TotalMicrocredits pgtype.Numeric
 	TotalCredits      pgtype.Numeric
 	TotalCost         pgtype.Numeric
@@ -168,6 +170,7 @@ func (q *Queries) GetUsageByPath(ctx context.Context, arg GetUsageByPathParams) 
 			&i.L1,
 			&i.L2,
 			&i.L3,
+			&i.L4,
 			&i.TotalMicrocredits,
 			&i.TotalCredits,
 			&i.TotalCost,

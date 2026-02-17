@@ -33,6 +33,7 @@ func (s *BasicReportSpace) getParent() ReportLinker   { return s.org }
 
 func (l *BasicReportLinker) getParent() ReportLinker     { return l.root }
 func (l *BasicReportLinker) getChildren() []ReportLinker { return nil }
+func (l *BasicReportLinker) addChild(ReportLinker)       {}
 
 func (r *BasicReport) SetOrg(uCredits int, name string) (ReportLinker, error) {
 	org := &BasicReportOrg{Name: name}

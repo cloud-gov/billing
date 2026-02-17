@@ -28,6 +28,7 @@ select
     '\1'
   )::text, '') as l2,
   coalesce(subpath(rn.path, 3, -1)::text, '') as l3,
+  coalesce(subpath(rn.path, 4)::text, '') as l4,
   sum(m.amount_microcredits) as total_microcredits,
   round(sum(m.amount_microcredits) * 1e-6, 3) as total_credits,
   round(sum(m.amount_microcredits) * 1e-6 * 50, 2) as total_cost
@@ -36,7 +37,7 @@ from resource_node as rn
 where
   rn.customer_id = $1
   and rn.path ~ sqlc.arg('path')::lquery
-group by rollup (l1, l2, l3)
+group by rollup (l1, l2, l3, l4)
 order by l1;
 
 -- name: GetAppsUsageBySpace :many
