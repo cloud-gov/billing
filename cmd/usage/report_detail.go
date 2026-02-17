@@ -4,7 +4,9 @@ import "fmt"
 
 type (
 	Report struct {
+		UCreditSum int
 		ReportLink
+		ReportWriter
 	}
 	ReportNode struct {
 		Path       string
@@ -35,6 +37,15 @@ func (n *ReportNode) getChildren() []ReportLinker {
 	}
 }
 
+func (n *ReportNode) addChild(link ReportLinker) {
+	switch l := link.(type) {
+	case *ReportLeaf:
+		n.Meters = append(n.Meters, l)
+	case *ReportNode:
+		n.Nodes = append(n.Nodes, l)
+	}
+}
+
 func (rl *ReportLink) getParent() ReportLinker {
 	if rl.parent != nil {
 		return rl.parent
@@ -43,31 +54,37 @@ func (rl *ReportLink) getParent() ReportLinker {
 	}
 }
 
+func (rl *ReportLink) addChild(link ReportLinker) {
+	rl.Nodes = append(rl.Nodes, link.(*ReportNode))
+}
+
 func (rl *ReportLink) getChildren() []ReportLinker { return sliceToReportLinkers(rl.Nodes) }
 func (rl *ReportLink) setRoot(r *Report)           { rl.root = r }
 func (rl *ReportLink) setParent(r ReportLinker)    { rl.parent = r }
 
 func (r *Report) SetNode(link ReportLinker, uCredits int, kind any, name, path string) (ReportLinker, error) {
-	var rl rootParenter
+	var rp rootParenter
 
-	ks, ok := kind.(string)
-	if !ok {
+	if kk, ok := kind.(Kind); ok && kk.isMeter() { // this could also be implicit by excluding a name & path?
+		rp = &ReportLeaf{Kind: kk.meterName(), UCreditUse: uCredits}
+	} else if ok {
+		rp = &ReportNode{Kind: kk.String(), UCreditSum: uCredits, Slug: name, Path: path}
+	} else if ks, ok := kind.(string); ok {
+		rp = &ReportNode{Kind: ks, UCreditSum: uCredits, Slug: name, Path: path}
+	} else {
 		return nil, fmt.Errorf("Report SetNode: kind must be stringable, got: %T", kind)
 	}
 
-	if kk, ok := kind.(Kind); ok && kk.isMeter() { // this could also be implicit by excluding a name & path?
-		rl = &ReportLeaf{Kind: kk.meterName(), UCreditUse: uCredits}
-	} else {
-		rl = &ReportNode{Kind: ks, UCreditSum: uCredits, Slug: name, Path: path}
-	}
+	rl := rp.(ReportLinker)
+	link.addChild(rl)
 
-	rl.setRoot(r)
-	rl.setParent(link)
+	rp.setRoot(r)
+	rp.setParent(link)
 
-	return rl.(ReportLinker), nil
+	return rl, nil
 }
 
-func NewReporter() ReportLinker {
+func NewReporter() *Report {
 	report := &Report{}
 	report.root = report
 	return report

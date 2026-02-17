@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/cloud-gov/billing/internal/config"
@@ -19,21 +21,28 @@ import (
 )
 
 var (
-	ErrArgsShort           = errors.New("not enough args")
-	ErrArgsNoCustomer      = errors.New("no customer ID supplied")
-	ErrGetCustomer         = errors.New("getting customer")
-	ErrArgsNoQuery         = errors.New("no query supplied")
-	ErrBadConfig           = errors.New("reading config from environment")
-	ErrCFClient            = errors.New("creating Cloud Foundry client")
-	ErrCFConfig            = errors.New("parsing Cloud Foundry connection configuration")
-	ErrCrontab             = errors.New("parsing crontab for periodic job execution")
-	ErrDBConn              = errors.New("connecting to database")
-	ErrGettingNodes        = errors.New("getting nodes")
-	ErrGettingMeasurements = errors.New("getting nodes")
+	ErrGetCustomer    = errors.New("getting customer")
+	ErrBadConfig      = errors.New("reading config from environment")
+	ErrDBConn         = errors.New("connecting to database")
+	ErrGettingNodes   = errors.New("getting nodes")
+	ErrCreatingReport = errors.New("making report")
 )
 
 func fmtErr(outer, inner error) error {
 	return fmt.Errorf("%w: %w", outer, inner)
+}
+
+var (
+	appReg = regexp.MustCompile(`^app_[^\.]+$`)
+	svcReg = regexp.MustCompile(`^svc_[^\.]+$`)
+)
+
+func isApp(s pgtype.Text) bool {
+	return appReg.MatchString(s.String)
+}
+
+func isService(s pgtype.Text) bool {
+	return svcReg.MatchString(s.String)
 }
 
 var (
@@ -92,12 +101,93 @@ func run(ctx context.Context, out io.Writer) error {
 	nodeQuery := buildQuery()
 
 	logger.Debug("run: getting usage", "customerID", customerID, "query", nodeQuery)
-	n, err := getNodes(ctx, q, nodeQuery, customerID)
+	nodes, err := getNodes(ctx, q, nodeQuery, customerID)
 	if err != nil {
 		return fmtErr(ErrGettingNodes, err)
 	}
+	logger.Debug("run: got usage", "usage", nodes)
 
-	logger.Debug("run: got usage", "usage", n)
+	logger.Debug("run: making report")
+	slices.Reverse(nodes)
+	report := NewReporter()
+	var link ReportLinker
+	for i, n := range nodes {
+		uCreds, err := n.TotalMicrocredits.Int64Value()
+		if err != nil {
+			return fmtErr(ErrCreatingReport, err)
+		}
+		uCredsInt := int(uCreds.Int64)
+
+		if i == 0 {
+			report.UCreditSum = uCredsInt
+			continue
+		}
+
+		p := nodes[i-1]
+
+		// org
+		if n.L1.Valid && !n.L2.Valid {
+			// org is always linked to root
+			link, err = report.SetNode(report, uCredsInt, Org, n.L1.String, "")
+			if err != nil {
+				return fmtErr(ErrCreatingReport, err)
+			}
+			continue
+		}
+
+		// space generalized
+		if n.L2.Valid && !n.L3.Valid {
+			if p.L4.Valid { // go back from leaf > space/s > space/g > org
+				link = link.getParent().getParent().getParent()
+			} else if p.L3.Valid { // go back from space/s > space/g > org
+				link = link.getParent().getParent()
+			} else if p.L2.Valid { // go space/g > org
+				link = link.getParent()
+			}
+			link, err = report.SetNode(link, uCredsInt, Space, n.L2.String, "")
+			if err != nil {
+				return fmtErr(ErrCreatingReport, err)
+			}
+			continue
+		}
+
+		// space specific
+		if n.L3.Valid && !n.L4.Valid {
+			if p.L4.Valid { // go back from leaf > space/s > space/g
+				link = link.getParent().getParent()
+			} else if p.L3.Valid { // go space/s > space/g
+				link = link.getParent()
+			}
+			link, err = report.SetNode(link, uCredsInt, Space, n.L3.String, "")
+			if err != nil {
+				return fmtErr(ErrCreatingReport, err)
+			}
+			continue
+		}
+
+		if n.L4.Valid {
+			if p.L4.Valid { // go from leaf > space/s
+				link = link.getParent()
+			}
+
+			var k Kind
+			if isApp(n.L4) {
+				k = CfApp
+			} else if isService(n.L4) {
+				k = CfSvc
+			}
+
+			link, err = report.SetNode(link, uCredsInt, k, n.L4.String, "")
+			if err != nil {
+				return fmtErr(ErrCreatingReport, err)
+			}
+			continue
+		}
+
+		logger.Debug("weirds gotten in report", "node", n)
+
+	}
+	logger.Debug("run: got report", "report", report)
 
 	return err
 }

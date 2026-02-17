@@ -1,6 +1,8 @@
 package main
 
-import "regexp"
+import (
+	"regexp"
+)
 
 type ReportWriter interface {
 	SetNode(link ReportLinker, uCredits int, kind any, name, path string) (ReportLinker, error)
@@ -9,6 +11,7 @@ type ReportWriter interface {
 type ReportLinker interface {
 	getParent() ReportLinker
 	getChildren() []ReportLinker
+	addChild(ReportLinker)
 }
 
 type rootParenter interface {
@@ -26,10 +29,10 @@ func sliceToReportLinkers[S ~[]N, N ReportLinker](s S) (l []ReportLinker) {
 type Kind string
 
 const (
-	Org        Kind = "cf_org"
-	Space      Kind = "cf_space"
-	CFApps     Kind = "meter::cfapps"
-	CFServices Kind = "meter::cfservices"
+	Org   Kind = "cf_org"
+	Space Kind = "cf_space"
+	CfApp Kind = "meter::cfapps"
+	CfSvc Kind = "meter::cfservices"
 )
 
 var meterReg = regexp.MustCompile(`^meter::(\w+)`)
@@ -39,7 +42,8 @@ func (k Kind) String() string {
 }
 
 func (k Kind) isMeter() bool {
-	return meterReg.MatchString(k.String())
+	res := meterReg.MatchString(k.String())
+	return res
 }
 
 func (k Kind) meterName() string {
