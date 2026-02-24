@@ -51,6 +51,9 @@ var (
 	lquery string
 	org    string
 	space  string
+	after  int
+	before int
+	period string
 )
 
 func init() {
@@ -59,6 +62,9 @@ func init() {
 	flag.StringVar(&lquery, "lq", "", "Provide an `lquery` to search with; supercedes org & space")
 	flag.StringVar(&org, "org", "", "Filter by org name")
 	flag.StringVar(&space, "space", "", "Filter by space same")
+	flag.IntVar(&after, "a", -1, "Filter [a]fter n-periods")
+	flag.IntVar(&before, "b", 0, "Filter [b]efore n-periods")
+	flag.StringVar(&period, "p", "month", "Time [p]eriod/interval, e.g. month, week, day")
 	flag.Parse()
 }
 
@@ -196,6 +202,9 @@ func getNodes(ctx context.Context, q db.Querier, query string, customerID pgtype
 	return q.GetUsageByPath(ctx, db.GetUsageByPathParams{
 		Path:       query,
 		CustomerID: customerID,
+		Before:     int32(before),
+		After:      int32(after),
+		Period:     period,
 	})
 }
 

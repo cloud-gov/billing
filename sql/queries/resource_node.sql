@@ -20,7 +20,25 @@ select * from resource_node
 where customer_id = $1 and path ~ sqlc.arg(path)::lquery;
 
 -- name: GetUsageByPath :many
+with
+  reads (id, created_at) as (
+    select
+      id,
+      created_at
+    from reading
+    where created_at >= date_trunc(
+        @period,
+        current_date + (@after::int || ' ' || @period)::interval
+      )
+      and created_at < date_trunc(
+        @period,
+        current_date + (@before::int || ' ' || @period)::interval
+      )
+    order by created_at desc
+  )
+
 select
+  date_trunc(@period, r.created_at) as period,
   coalesce(subltree(rn.path, 2, 3)::text, '') as l1,
   coalesce(regexp_replace(
     subltree(rn.path, 3, 4)::text,
@@ -34,10 +52,11 @@ select
   round(sum(m.amount_microcredits) * 1e-6 * 50, 2) as total_cost
 from resource_node as rn
   inner join measurement as m on rn.resource_natural_id = m.resource_natural_id
+  inner join reads as r on m.reading_id = r.id
 where
-  rn.customer_id = $1
-  and rn.path ~ sqlc.arg('path')::lquery
-group by rollup (l1, l2, l3, l4)
+  rn.customer_id = @customer_id
+  and rn.path ~ @path::lquery
+group by rollup (period, l1, l2, l3, l4)
 order by l1;
 
 -- name: GetAppsUsageBySpace :many
