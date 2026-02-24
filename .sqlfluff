@@ -1,5 +1,9 @@
 [sqlfluff]
 dialect = postgres
+templater = placeholder
+
+[sqlfluff:templater:placeholder]
+param_regex = (sqlc.n?arg\('?\w+'?\)|@\w+)
 
 [sqlfluff:indentation]
 tab_space_size = 2
