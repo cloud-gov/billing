@@ -144,6 +144,10 @@ psql-testdb:
 riverui:
 	@set -a; source docker.env; set +a; riverui
 
+.PHONY: psql
+riverui:
+	@set -a; source docker.env; set +a; riverui
+
 .PHONY: db-schema
 db-schema:
 	@\
