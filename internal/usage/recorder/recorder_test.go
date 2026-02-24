@@ -176,7 +176,27 @@ func (s *stubQuerier) GetCustomer(_ context.Context, id pgtype.UUID) (db.Custome
 	panic("unimplemented")
 }
 
+func (s *stubQuerier) GetCustomersByName(_ context.Context, name string) ([]db.Customer, error) {
+	panic("unimplemented")
+}
+
 func (s *stubQuerier) GetAccountForCustomerAndType(_ context.Context, arg db.GetAccountForCustomerAndTypeParams) (db.Account, error) {
+	panic("unimplemented")
+}
+
+func (s *stubQuerier) GetUsageByPath(ctx context.Context, arg db.GetUsageByPathParams) ([]db.GetUsageByPathRow, error) {
+	panic("unimplemented")
+}
+
+func (s *stubQuerier) LQueryResourceNodes(ctx context.Context, arg db.LQueryResourceNodesParams) ([]db.ResourceNode, error) {
+	panic("unimplemented")
+}
+
+func (q *stubQuerier) ListResourceNodeAncestors(ctx context.Context, path string) ([]db.ResourceNode, error) {
+	panic("unimplemented")
+}
+
+func (q *stubQuerier) ListResourceNodeDescendants(ctx context.Context, path string) ([]db.ResourceNode, error) {
 	panic("unimplemented")
 }
 
