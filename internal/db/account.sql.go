@@ -10,7 +10,7 @@ import (
 )
 
 const getAccountForCustomerAndType = `-- name: GetAccountForCustomerAndType :one
-SELECT a.id, a.customer_id, a.type
+SELECT a.id, a.type, a.customer_id
 FROM account a
 JOIN customer c on a.customer_id = c.id
 WHERE c.name = $1
@@ -26,6 +26,6 @@ type GetAccountForCustomerAndTypeParams struct {
 func (q *Queries) GetAccountForCustomerAndType(ctx context.Context, arg GetAccountForCustomerAndTypeParams) (Account, error) {
 	row := q.db.QueryRow(ctx, getAccountForCustomerAndType, arg.Name, arg.Type)
 	var i Account
-	err := row.Scan(&i.ID, &i.CustomerID, &i.Type)
+	err := row.Scan(&i.ID, &i.Type, &i.CustomerID)
 	return i, err
 }

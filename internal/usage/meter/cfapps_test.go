@@ -89,7 +89,7 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 		app1 = "app‑1"
 		app2 = "app‑2"
 		sp   = "space‑1"
-		org  = "org‑1"
+		org  = "10000000-0000-0000-0000-000000000001"
 	)
 
 	hugeInstances := 1024
@@ -201,9 +201,16 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 				}
 			}()
 
-			sut := meter.NewCFAppMeter(slog.Default(), &MockAppClient{Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr}, &MockProcessClient{Processes: tc.procs, Err: tc.procErr})
+			sut := meter.NewCFAppMeter(
+				slog.Default(),
+				&MockAppMeterCfProvider{
+					Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr,
+					Processes: tc.procs, ProcErr: tc.procErr,
+				},
+				&StubDbQ{},
+			)
 
-			got, err := sut.ReadUsage(t.Context())
+			got, _, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}

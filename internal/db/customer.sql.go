@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCustomer = `-- name: CreateCustomer :one
@@ -31,9 +33,9 @@ FROM cust
 `
 
 // CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
-func (q *Queries) CreateCustomer(ctx context.Context, name string) (int64, error) {
+func (q *Queries) CreateCustomer(ctx context.Context, name string) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, createCustomer, name)
-	var id int64
+	var id pgtype.UUID
 	err := row.Scan(&id)
 	return id, err
 }
@@ -43,25 +45,64 @@ DELETE FROM customer
 WHERE id = $1
 `
 
-func (q *Queries) DeleteCustomer(ctx context.Context, id int64) error {
+func (q *Queries) DeleteCustomer(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteCustomer, id)
 	return err
 }
 
 const getCustomer = `-- name: GetCustomer :one
-SELECT id, name, tier_id FROM customer
+SELECT old_id, name, tier_id, id, path, slug FROM customer
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetCustomer(ctx context.Context, id int64) (Customer, error) {
+func (q *Queries) GetCustomer(ctx context.Context, id pgtype.UUID) (Customer, error) {
 	row := q.db.QueryRow(ctx, getCustomer, id)
 	var i Customer
-	err := row.Scan(&i.ID, &i.Name, &i.TierID)
+	err := row.Scan(
+		&i.OldID,
+		&i.Name,
+		&i.TierID,
+		&i.ID,
+		&i.Path,
+		&i.Slug,
+	)
 	return i, err
 }
 
+const getCustomersByName = `-- name: GetCustomersByName :many
+SELECT old_id, name, tier_id, id, path, slug FROM customer
+WHERE name ~* $1
+`
+
+func (q *Queries) GetCustomersByName(ctx context.Context, name string) ([]Customer, error) {
+	rows, err := q.db.Query(ctx, getCustomersByName, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Customer
+	for rows.Next() {
+		var i Customer
+		if err := rows.Scan(
+			&i.OldID,
+			&i.Name,
+			&i.TierID,
+			&i.ID,
+			&i.Path,
+			&i.Slug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCustomers = `-- name: ListCustomers :many
-SELECT id, name, tier_id FROM customer
+SELECT old_id, name, tier_id, id, path, slug FROM customer
 ORDER BY name
 `
 
@@ -74,7 +115,14 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	var items []Customer
 	for rows.Next() {
 		var i Customer
-		if err := rows.Scan(&i.ID, &i.Name, &i.TierID); err != nil {
+		if err := rows.Scan(
+			&i.OldID,
+			&i.Name,
+			&i.TierID,
+			&i.ID,
+			&i.Path,
+			&i.Slug,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -92,7 +140,7 @@ WHERE id = $1
 `
 
 type UpdateCustomerParams struct {
-	ID   int64
+	ID   pgtype.UUID
 	Name string
 }
 

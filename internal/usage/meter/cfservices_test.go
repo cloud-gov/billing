@@ -11,15 +11,47 @@ import (
 
 func TestCFServiceMeter_ReadUsage(t *testing.T) {
 	// arrange
-	services := NewMockServiceInstanceClient()
-	spaces := NewMockSpaceClient()
+	cfProvider := NewMockServiceMeterCfProvider()
 
-	instanceID := newUUID()
+	offeringID := newUUID()
 	planID := newUUID()
-	spaceID := newUUID()
 	orgID := newUUID()
+	spaceID := newUUID()
+	instanceID := newUUID()
 
-	services.ServiceInstances = append(services.ServiceInstances, &resource.ServiceInstance{
+	cfProvider.Offerings = append(cfProvider.Offerings, &resource.ServiceOffering{
+		Resource: resource.Resource{
+			GUID: offeringID,
+		},
+	})
+
+	cfProvider.Plans = append(cfProvider.Plans, &resource.ServicePlan{
+		Resource: resource.Resource{
+			GUID: planID,
+		},
+		Relationships: resource.ServicePlanRelationship{
+			ServiceOffering: resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: offeringID,
+				},
+			},
+		},
+	})
+
+	cfProvider.Spaces = append(cfProvider.Spaces, &resource.Space{
+		Resource: resource.Resource{
+			GUID: spaceID,
+		},
+		Relationships: &resource.SpaceRelationships{
+			Organization: &resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: orgID,
+				},
+			},
+		},
+	})
+
+	cfProvider.Instances = append(cfProvider.Instances, &resource.ServiceInstance{
 		Resource: resource.Resource{
 			GUID: instanceID,
 		},
@@ -36,24 +68,11 @@ func TestCFServiceMeter_ReadUsage(t *testing.T) {
 			},
 		},
 	})
-	spaces.Spaces = append(spaces.Spaces, &resource.Space{
-		Resource: resource.Resource{
-			GUID: spaceID,
-		},
-		Relationships: &resource.SpaceRelationships{
-			Organization: &resource.ToOneRelationship{
-				Data: &resource.Relationship{
-					GUID: orgID,
-				},
-			},
-		},
-	})
 
-	sut := meter.NewCFServiceMeter(slog.Default(), services, spaces)
+	sut := meter.NewCFServiceMeter(slog.Default(), cfProvider, &StubDbQ{})
 
 	// act
-	readings, err := sut.ReadUsage(t.Context())
-
+	readings, _, err := sut.ReadUsage(t.Context())
 	// assert
 	if err != nil {
 		t.Fatal("error was not expected when reading usage", err)

@@ -43,7 +43,6 @@ debug: gen
 
 
 .PHONY: debug-test-db
-debug-test-db: export PGDATABASE = postgres
 debug-test-db: export PGPORT = 5433
 debug-test-db:
 	@# Equivalent to `make db-up` and `make db-down`, but for the ephemeral database
@@ -51,7 +50,8 @@ debug-test-db:
 	@docker compose up --detach --wait test-db-ephemeral
 
 	@# Equivalent to `make db-init`, but for the ephemeral database
-	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@PGDATABASE=postgres \
+	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.
@@ -140,6 +140,10 @@ psql-testdb: export PGPORT = 5433
 psql-testdb:
 	psql
 
+.PHONY: riverui
+riverui:
+	@riverui
+
 .PHONY: db-schema
 db-schema:
 	@\
@@ -149,7 +153,6 @@ db-schema:
 	> sql/schema/generated.sql
 
 .PHONY: test-db
-test-db: export PGDATABASE = postgres
 test-db: export PGPORT = 5433
 test-db:
 	@# Equivalent to `make db-up` and `make db-down`, but for the ephemeral database
@@ -157,7 +160,8 @@ test-db:
 	@docker compose up --detach --wait test-db-ephemeral
 
 	@# Equivalent to `make db-init`, but for the ephemeral database
-	@go tool tern migrate --config sql/init/tern.conf --migrations sql/init
+	@PGDATABASE=postgres \
+	go tool tern migrate --config sql/init/tern.conf --migrations sql/init
 
 	@# Equivalent to `make db-migrate`, but for the ephemeral database.
 	@# Migrate to the latest migration.

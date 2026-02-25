@@ -26,12 +26,14 @@ type Querier interface {
 	// BulkCreateResourceKinds creates ResourceKind rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResourceKinds(ctx context.Context, arg BulkCreateResourceKindsParams) error
+	// BulkCreateResourcesNodes creates Resource_Node rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
+	BulkCreateResourceNodes(ctx context.Context, arg BulkCreateResourceNodesParams) error
 	// BulkCreateResources creates Resource rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	// The bulk insert pattern using multiple arrays is sourced from: https://github.com/sqlc-dev/sqlc/issues/218#issuecomment-829263172
 	BulkCreateResources(ctx context.Context, arg BulkCreateResourcesParams) error
 	CreateCFOrg(ctx context.Context, arg CreateCFOrgParams) (CFOrg, error)
 	// CreateCustomer adds a customer to the database and creates Accounts for the customer for every AccountType available. Returns the ID of the new Customer.
-	CreateCustomer(ctx context.Context, name string) (int64, error)
+	CreateCustomer(ctx context.Context, name string) (pgtype.UUID, error)
 	CreateMeasurement(ctx context.Context, arg CreateMeasurementParams) (Measurement, error)
 	CreateMeasurements(ctx context.Context, arg []CreateMeasurementsParams) (int64, error)
 	CreateMeter(ctx context.Context, name string) (string, error)
@@ -45,22 +47,30 @@ type Querier interface {
 	// CreateUniqueReading creates a Reading if one does not exist for the hour specified in created_at. It returns [pgx.ErrNoRows] if a Reading already exists.
 	CreateUniqueReading(ctx context.Context, arg CreateUniqueReadingParams) (Reading, error)
 	DeleteCFOrg(ctx context.Context, id pgtype.UUID) error
-	DeleteCustomer(ctx context.Context, id int64) error
+	DeleteCustomer(ctx context.Context, id pgtype.UUID) error
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	DeleteResourceKind(ctx context.Context, arg DeleteResourceKindParams) error
 	DeleteTier(ctx context.Context, id int32) error
 	GetAccountForCustomerAndType(ctx context.Context, arg GetAccountForCustomerAndTypeParams) (Account, error)
+	GetAppsUsageBySpace(ctx context.Context, customerID pgtype.UUID) ([]GetAppsUsageBySpaceRow, error)
 	GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error)
-	GetCustomer(ctx context.Context, id int64) (Customer, error)
+	GetCustomer(ctx context.Context, id pgtype.UUID) (Customer, error)
+	GetCustomersByName(ctx context.Context, name string) ([]Customer, error)
 	GetEntriesForCustomerAndType(ctx context.Context, arg GetEntriesForCustomerAndTypeParams) ([]Entry, error)
 	GetEntry(ctx context.Context, arg GetEntryParams) (Entry, error)
+	GetResource(ctx context.Context, arg GetResourceParams) (Resource, error)
 	GetResourceKind(ctx context.Context, arg GetResourceKindParams) (ResourceKind, error)
+	GetResourceNode(ctx context.Context, arg GetResourceNodeParams) (ResourceNode, error)
 	GetTier(ctx context.Context, id int32) (Tier, error)
 	GetTransaction(ctx context.Context, id int32) (Transaction, error)
+	GetUsageByPath(ctx context.Context, arg GetUsageByPathParams) ([]GetUsageByPathRow, error)
+	LQueryResourceNodes(ctx context.Context, arg LQueryResourceNodesParams) ([]ResourceNode, error)
 	ListCFOrgs(ctx context.Context) ([]CFOrg, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListMeasurements(ctx context.Context) ([]Measurement, error)
 	ListResourceKind(ctx context.Context) ([]ResourceKind, error)
+	ListResourceNodeAncestors(ctx context.Context, path string) ([]ResourceNode, error)
+	ListResourceNodeDescendants(ctx context.Context, path string) ([]ResourceNode, error)
 	ListResources(ctx context.Context) ([]Resource, error)
 	ListTiers(ctx context.Context) ([]Tier, error)
 	ListTransactions(ctx context.Context) ([]Transaction, error)

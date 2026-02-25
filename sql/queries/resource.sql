@@ -1,4 +1,4 @@
-  -- name: GetResource :one
+-- name: GetResource :one
 SELECT * FROM resource
 WHERE meter = $1 AND natural_id = $2 LIMIT 1;
 

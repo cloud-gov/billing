@@ -6,7 +6,9 @@ import (
 	"github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/cloud-gov/billing/internal/db"
 	_ "github.com/cloud-gov/billing/internal/usage/meter" // Imported so doc comment references work.
 )
 
@@ -14,67 +16,60 @@ func newUUID() string {
 	return uuid.NewString()
 }
 
-// MockProcessClient is an in-memory implementation of [meter.CFAppClient].
-type MockAppClient struct {
-	Apps   []*resource.App
-	Spaces []*resource.Space
-	AppErr error
+// TODO: it would be better to use a test DB than these stubs
+type StubDbQ struct {
+	Org      db.CFOrg
+	OrgError error
 }
 
-func NewMockAppClient() *MockAppClient {
-	return &MockAppClient{
-		Apps:   []*resource.App{},
-		Spaces: []*resource.Space{},
-	}
+func (d *StubDbQ) GetCFOrg(ctx context.Context, id pgtype.UUID) (o db.CFOrg, e error) {
+	o = d.Org
+	e = d.OrgError
+
+	return o, e
 }
 
-func (c *MockAppClient) ListIncludeSpacesAll(_ context.Context, _ *client.AppListOptions) ([]*resource.App, []*resource.Space, error) {
-	return c.Apps, c.Spaces, c.AppErr
-}
-
-// MockServiceInstanceClient is an in-memory implementation of [meter.CFServiceInstanceClient].
-type MockServiceInstanceClient struct {
-	// need to be able to populate this with service instances for testing
-	ServiceInstances []*resource.ServiceInstance
-}
-
-func NewMockServiceInstanceClient() *MockServiceInstanceClient {
-	return &MockServiceInstanceClient{
-		ServiceInstances: make([]*resource.ServiceInstance, 0),
-	}
-}
-
-func (c *MockServiceInstanceClient) ListAll(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
-	return c.ServiceInstances, nil
-}
-
-// MockSpaceClient is an in-memory mock implementation of [meter.CFSpaceClient].
-type MockSpaceClient struct {
-	Spaces []*resource.Space
-}
-
-func NewMockSpaceClient() *MockSpaceClient {
-	return &MockSpaceClient{
-		Spaces: make([]*resource.Space, 0),
-	}
-}
-
-func (c *MockSpaceClient) ListAll(_ context.Context, _ *client.SpaceListOptions) ([]*resource.Space, error) {
-	return c.Spaces, nil
-}
-
-// MockProcessClient is an in-memory implementation of [meter.CFProcessClient].
-type MockProcessClient struct {
+// MockAppMeterCfProvider is an in-memory implementation of [meter.AppMeterCfProvider].
+type MockAppMeterCfProvider struct {
+	Apps      []*resource.App
+	Spaces    []*resource.Space
 	Processes []*resource.Process
-	Err       error
+	AppErr    error
+	ProcErr   error
 }
 
-func NewMockProcessClient() *MockProcessClient {
-	return &MockProcessClient{
-		Processes: []*resource.Process{},
-	}
+// MockServiceMeterCfProvider is an in-memory implementation of [meter.ServiceMeterCfProvider].
+type MockServiceMeterCfProvider struct {
+	Spaces    []*resource.Space
+	Instances []*resource.ServiceInstance
+	Plans     []*resource.ServicePlan
+	Offerings []*resource.ServiceOffering
 }
 
-func (c *MockProcessClient) ListAll(_ context.Context, _ *client.ProcessListOptions) ([]*resource.Process, error) {
-	return c.Processes, c.Err
+func NewMockAppMeterCfProvider() *MockAppMeterCfProvider {
+	return &MockAppMeterCfProvider{}
+}
+
+func NewMockServiceMeterCfProvider() *MockServiceMeterCfProvider {
+	return &MockServiceMeterCfProvider{}
+}
+
+func (p *MockAppMeterCfProvider) AppsListWithSpaces(_ context.Context, _ *client.AppListOptions) ([]*resource.App, []*resource.Space, error) {
+	return p.Apps, p.Spaces, p.AppErr
+}
+
+func (p *MockAppMeterCfProvider) ProcessesList(_ context.Context, _ *client.ProcessListOptions) ([]*resource.Process, error) {
+	return p.Processes, p.ProcErr
+}
+
+func (p *MockServiceMeterCfProvider) SpacesList(_ context.Context, _ *client.SpaceListOptions) ([]*resource.Space, error) {
+	return p.Spaces, nil
+}
+
+func (p *MockServiceMeterCfProvider) ServiceInstancesList(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
+	return p.Instances, nil
+}
+
+func (p *MockServiceMeterCfProvider) ServicePlansOfferingsList(_ context.Context, _ *client.ServicePlanListOptions) ([]*resource.ServicePlan, []*resource.ServiceOffering, error) {
+	return p.Plans, p.Offerings, nil
 }

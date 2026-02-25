@@ -45,7 +45,7 @@ type testData struct {
 	Accounts []Account
 	CFOrgs   []CFOrg
 	// CustomerIDs maps from customer names (known in advance) to customer ID (returned by INSERT).
-	CustomerIDs   map[string]int64
+	CustomerIDs   map[string]pgtype.UUID
 	Customers     []db.Customer
 	Entries       []Entry
 	Measurements  []db.Measurement
@@ -94,7 +94,6 @@ func TestDBBoundsMonthPrev(t *testing.T) {
 
 			// Act
 			result, err := q.BoundsMonthPrev(t.Context(), tc.AsOf)
-
 			// Assert
 			if err != nil {
 				t.Fatal("error calling the function under test", err)
@@ -138,7 +137,7 @@ func newTx(t *testing.T, conn *pgxpool.Pool, commit bool) dbx.Querier {
 		t.Cleanup(func() {
 			err = tx.Rollback(ctx)
 			// Ignore error if the transaction was already committed
-			if err != nil && !errors.Is(pgx.ErrTxClosed, err) {
+			if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				t.Fatal("failed to rollback transaction: ", err)
 			}
 		})
@@ -295,7 +294,6 @@ func TestDBUpdateMeasurementMicrocredits(t *testing.T) {
 
 	// Act
 	updated, err := q.UpdateMeasurementMicrocredits(t.Context(), asOf)
-
 	// Assert
 	if err != nil {
 		t.Fatal("error occured while calling function under test", err)
@@ -355,6 +353,7 @@ func measurementFromReadingID(m []db.Measurement, id int32) int {
 		return e.ReadingID == id
 	})
 }
+
 func TestDBPostUsage(t *testing.T) {
 	_, _ = time.LoadLocation("America/New_York")
 
@@ -391,7 +390,7 @@ func TestDBPostUsage(t *testing.T) {
 			Name: "boundary test: 1 customer, multiple readings over time",
 			AsOf: asOf,
 			Before: testData{
-				CustomerIDs: map[string]int64{},
+				CustomerIDs: map[string]pgtype.UUID{},
 				Customers: []db.Customer{
 					{
 						Name: customer1Name,
@@ -551,7 +550,7 @@ func TestDBPostUsage(t *testing.T) {
 			Name: "multiple customers with multiple readings in bounds",
 			AsOf: asOf,
 			Before: testData{
-				CustomerIDs: map[string]int64{},
+				CustomerIDs: map[string]pgtype.UUID{},
 				Customers: []db.Customer{
 					{
 						Name: customer1Name,
@@ -751,7 +750,7 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatal("creating CFOrg: could not look up customer ID by name in CustomerIDs map (did you declare it in testData and include a name?)")
 			}
-			v.CFOrg.CustomerID = PgInt8(customerID)
+			v.CustomerID = customerID
 		}
 		_, err := q.CreateCFOrg(t.Context(), db.CreateCFOrgParams(v.CFOrg))
 		if err != nil {
@@ -796,13 +795,16 @@ func createTestData(t *testing.T, q db.Querier, td testData) {
 		}
 	}
 	for _, v := range td.Measurements {
-		q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
+		_, err := q.CreateMeasurement(t.Context(), db.CreateMeasurementParams{
 			ReadingID:          v.ReadingID,
 			Meter:              v.Meter,
 			ResourceNaturalID:  v.ResourceNaturalID,
 			Value:              v.Value,
 			AmountMicrocredits: v.AmountMicrocredits,
 		})
+		if err != nil {
+			t.Fatal("creating measurement failed:", err)
+		}
 	}
 }
 
@@ -856,7 +858,7 @@ func assertDBContains(t *testing.T, q db.Querier, td testData) {
 			if !ok {
 				t.Fatalf("could not find customer ID for name %v", want.CustomerName)
 			}
-			want.Transaction.CustomerID = PgInt8(custID)
+			want.CustomerID = custID
 			return cmp.Equal(want.Transaction, have, cmp.Comparer(func(x, y int32) bool {
 				// IDs are the only int32 field we're comparing; always return true
 				return true

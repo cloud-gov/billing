@@ -83,6 +83,28 @@ func (q *Queries) DeleteResource(ctx context.Context, arg DeleteResourceParams) 
 	return err
 }
 
+const getResource = `-- name: GetResource :one
+SELECT meter, natural_id, kind_natural_id, cf_org_id FROM resource
+WHERE meter = $1 AND natural_id = $2 LIMIT 1
+`
+
+type GetResourceParams struct {
+	Meter     string
+	NaturalID string
+}
+
+func (q *Queries) GetResource(ctx context.Context, arg GetResourceParams) (Resource, error) {
+	row := q.db.QueryRow(ctx, getResource, arg.Meter, arg.NaturalID)
+	var i Resource
+	err := row.Scan(
+		&i.Meter,
+		&i.NaturalID,
+		&i.KindNaturalID,
+		&i.CFOrgID,
+	)
+	return i, err
+}
+
 const listResources = `-- name: ListResources :many
 SELECT meter, natural_id, kind_natural_id, cf_org_id FROM resource
 ORDER BY natural_id
