@@ -243,15 +243,21 @@ func getCustomerID(ctx context.Context, q dbx.Querier) (id pgtype.UUID, err erro
 		return dbx.UtilUUID(r), nil
 	}
 
-	if cs, e := q.GetCustomersByName(ctx, cname); e != nil {
-		err = fmtErr(ErrGetCustomer, e)
+	cs, e := q.GetCustomersByName(ctx, cname)
+	if e != nil {
+		return id, fmtErr(ErrGetCustomer, e)
+	} else if len(cs) == 1 {
+		return cs[0].ID, err
 	} else if len(cs) > 1 {
-		err = fmt.Errorf("got more than one customer for '%v'", cname)
-	} else {
-		id = cs[0].ID
+		cList := &strings.Builder{}
+		fmt.Fprint(cList, "found customers:\nname\tuuid\n")
+		for _, c := range cs {
+			fmt.Fprintf(cList, "%v\t%v\n", c.Name, c.ID)
+		}
+		slog.Error(cList.String())
 	}
 
-	return id, err
+	return id, fmt.Errorf("found %v customers for '%v', need 1", len(cs), cname)
 }
 
 func getRawCID() string {
