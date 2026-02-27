@@ -1,5 +1,5 @@
 
-\restrict LwrDFnwEbjalZALG3oW9zk7ZZbAYwslc4WYPM1KHqIfmULhmp7WCUaLAtmuCeWT
+\restrict JP7UL9V4bIFFj4NfpJZGfSwoLwoGXogzmaYh9ZX5veHmv4Ci4ChmsxFm2dYYGJp
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -506,10 +506,10 @@ ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_meter_natural_id_uq UNIQUE (meter, natural_id);
 
 ALTER TABLE ONLY public.resource_node
-    ADD CONSTRAINT resource_node_pkey PRIMARY KEY (customer_id, resource_natural_id);
+    ADD CONSTRAINT resource_node_path_uq UNIQUE (customer_id, path);
 
 ALTER TABLE ONLY public.resource_node
-    ADD CONSTRAINT resource_node_slug_uq UNIQUE (customer_id, slug);
+    ADD CONSTRAINT resource_node_pkey PRIMARY KEY (customer_id, resource_natural_id);
 
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_pkey PRIMARY KEY (meter, natural_id);
@@ -609,5 +609,5 @@ ALTER TABLE ONLY public.account
 ALTER TABLE ONLY public.resource_node
     ADD CONSTRAINT resource_node_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id);
 
-\unrestrict LwrDFnwEbjalZALG3oW9zk7ZZbAYwslc4WYPM1KHqIfmULhmp7WCUaLAtmuCeWT
+\unrestrict JP7UL9V4bIFFj4NfpJZGfSwoLwoGXogzmaYh9ZX5veHmv4Ci4ChmsxFm2dYYGJp
 
