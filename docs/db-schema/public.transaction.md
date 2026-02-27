@@ -10,7 +10,7 @@
 | occurred_at | timestamp with time zone |  | true |  |  |  |
 | description | text |  | true |  |  |  |
 | type | transaction_type |  | false |  |  |  |
-| customer_id | bigint |  | true |  |  | CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID. |
+| customer_id | uuid |  | true |  |  | CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID. |
 
 ## Constraints
 
@@ -41,7 +41,7 @@ erDiagram
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
 }
 "public.measurement" {
   integer reading_id FK
@@ -81,8 +81,8 @@ erDiagram
 }
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
+  uuid customer_id FK
 }
 ```
 

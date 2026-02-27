@@ -87,17 +87,20 @@ erDiagram
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
 }
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
+  uuid id
+  ltree path
+  varchar_256_ slug
 }
 ```
 

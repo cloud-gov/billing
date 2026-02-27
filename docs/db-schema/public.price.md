@@ -75,7 +75,7 @@ erDiagram
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
 }
 "public.resource_kind" {
   text meter FK

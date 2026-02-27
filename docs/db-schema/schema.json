@@ -50,7 +50,7 @@
       "type": "BASE TABLE",
       "columns": [
         {
-          "name": "id",
+          "name": "old_id",
           "type": "bigint",
           "nullable": false,
           "default": "nextval('customer_id_seq'::regclass)"
@@ -64,9 +64,33 @@
           "name": "tier_id",
           "type": "integer",
           "nullable": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "uuid_generate_v7()"
+        },
+        {
+          "name": "path",
+          "type": "ltree",
+          "nullable": true
+        },
+        {
+          "name": "slug",
+          "type": "varchar(256)",
+          "nullable": true
         }
       ],
       "indexes": [
+        {
+          "name": "customer_new_id_key",
+          "def": "CREATE UNIQUE INDEX customer_new_id_key ON public.customer USING btree (id)",
+          "table": "public.customer",
+          "columns": [
+            "new_id"
+          ]
+        },
         {
           "name": "customer_pkey",
           "def": "CREATE UNIQUE INDEX customer_pkey ON public.customer USING btree (id)",
@@ -74,9 +98,43 @@
           "columns": [
             "id"
           ]
+        },
+        {
+          "name": "customer_old_id_key",
+          "def": "CREATE UNIQUE INDEX customer_old_id_key ON public.customer USING btree (old_id)",
+          "table": "public.customer",
+          "columns": [
+            "old_id"
+          ]
+        },
+        {
+          "name": "customer_path_gist_idx",
+          "def": "CREATE INDEX customer_path_gist_idx ON public.customer USING gist (path)",
+          "table": "public.customer",
+          "columns": [
+            "path"
+          ]
+        },
+        {
+          "name": "customer_path_btree_idx",
+          "def": "CREATE INDEX customer_path_btree_idx ON public.customer USING btree (path)",
+          "table": "public.customer",
+          "columns": [
+            "path"
+          ]
         }
       ],
       "constraints": [
+        {
+          "name": "valid_path",
+          "type": "CHECK",
+          "def": "CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$'::text))",
+          "table": "public.customer",
+          "referenced_table": "",
+          "columns": [
+            "path"
+          ]
+        },
         {
           "name": "fk_tier_id",
           "type": "FOREIGN KEY",
@@ -91,6 +149,16 @@
           ]
         },
         {
+          "name": "customer_new_id_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (id)",
+          "table": "public.customer",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
           "name": "customer_pkey",
           "type": "PRIMARY KEY",
           "def": "PRIMARY KEY (id)",
@@ -98,6 +166,16 @@
           "referenced_table": "",
           "columns": [
             "id"
+          ]
+        },
+        {
+          "name": "customer_old_id_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (old_id)",
+          "table": "public.customer",
+          "referenced_table": "",
+          "columns": [
+            "old_id"
           ]
         }
       ]
@@ -118,7 +196,7 @@
         },
         {
           "name": "customer_id",
-          "type": "bigint",
+          "type": "uuid",
           "nullable": true
         }
       ],
@@ -142,6 +220,16 @@
       ],
       "constraints": [
         {
+          "name": "cf_org_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.cf_org",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
           "name": "fk_customer_id",
           "type": "FOREIGN KEY",
           "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)",
@@ -151,16 +239,6 @@
             "customer_id"
           ],
           "referenced_columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "cf_org_pkey",
-          "type": "PRIMARY KEY",
-          "def": "PRIMARY KEY (id)",
-          "table": "public.cf_org",
-          "referenced_table": "",
-          "columns": [
             "id"
           ]
         }
@@ -661,14 +739,14 @@
           "default": "nextval('account_id_seq'::regclass)"
         },
         {
-          "name": "customer_id",
-          "type": "bigint",
-          "nullable": false
-        },
-        {
           "name": "type",
           "type": "integer",
           "nullable": false
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": true
         }
       ],
       "indexes": [
@@ -701,19 +779,6 @@
       ],
       "constraints": [
         {
-          "name": "fk_customer_id",
-          "type": "FOREIGN KEY",
-          "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)",
-          "table": "public.account",
-          "referenced_table": "customer",
-          "columns": [
-            "customer_id"
-          ],
-          "referenced_columns": [
-            "id"
-          ]
-        },
-        {
           "name": "fk_type_id",
           "type": "FOREIGN KEY",
           "def": "FOREIGN KEY (type) REFERENCES account_type(id)",
@@ -733,6 +798,19 @@
           "table": "public.account",
           "referenced_table": "",
           "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "fk_customer_id",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)",
+          "table": "public.account",
+          "referenced_table": "customer",
+          "columns": [
+            "customer_id"
+          ],
+          "referenced_columns": [
             "id"
           ]
         }
@@ -765,7 +843,7 @@
         },
         {
           "name": "customer_id",
-          "type": "bigint",
+          "type": "uuid",
           "nullable": true,
           "comment": "CustomerID is somewhat redundant because the Entry rows associated with a Transaction are associated with Accounts, which are associated with a Customer. However, we have to create a Transaction before we create an Entry (see post_usage, ins_tx as an example). To join Measurements, Transactions, Entries, and Accounts, Transaction needs a CustomerID."
         }
@@ -960,6 +1038,124 @@
           ]
         }
       ]
+    },
+    {
+      "name": "public.resource_node",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "path",
+          "type": "ltree",
+          "nullable": true
+        },
+        {
+          "name": "slug",
+          "type": "varchar(256)",
+          "nullable": true
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "resource_natural_id",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "resource_node_pkey",
+          "def": "CREATE UNIQUE INDEX resource_node_pkey ON public.resource_node USING btree (customer_id, resource_natural_id)",
+          "table": "public.resource_node",
+          "columns": [
+            "customer_id",
+            "resource_natural_id"
+          ]
+        },
+        {
+          "name": "resource_path_gist_idx",
+          "def": "CREATE INDEX resource_path_gist_idx ON public.resource_node USING gist (path)",
+          "table": "public.resource_node",
+          "columns": [
+            "path"
+          ]
+        },
+        {
+          "name": "resource_path_btree_idx",
+          "def": "CREATE INDEX resource_path_btree_idx ON public.resource_node USING btree (path)",
+          "table": "public.resource_node",
+          "columns": [
+            "path"
+          ]
+        },
+        {
+          "name": "customer_path_idx",
+          "def": "CREATE INDEX customer_path_idx ON public.resource_node USING btree (customer_id, path)",
+          "table": "public.resource_node",
+          "columns": [
+            "customer_id",
+            "path"
+          ]
+        },
+        {
+          "name": "resource_node_path_uq",
+          "def": "CREATE UNIQUE INDEX resource_node_path_uq ON public.resource_node USING btree (customer_id, path)",
+          "table": "public.resource_node",
+          "columns": [
+            "customer_id",
+            "path"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "valid_path",
+          "type": "CHECK",
+          "def": "CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$'::text))",
+          "table": "public.resource_node",
+          "referenced_table": "",
+          "columns": [
+            "path"
+          ]
+        },
+        {
+          "name": "resource_node_customer_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)",
+          "table": "public.resource_node",
+          "referenced_table": "customer",
+          "columns": [
+            "customer_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "resource_node_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (customer_id, resource_natural_id)",
+          "table": "public.resource_node",
+          "referenced_table": "",
+          "columns": [
+            "customer_id",
+            "resource_natural_id"
+          ]
+        },
+        {
+          "name": "resource_node_path_uq",
+          "type": "UNIQUE",
+          "def": "UNIQUE (customer_id, path)",
+          "table": "public.resource_node",
+          "referenced_table": "",
+          "columns": [
+            "customer_id",
+            "path"
+          ]
+        }
+      ]
     }
   ],
   "relations": [
@@ -1087,19 +1283,6 @@
     {
       "table": "public.account",
       "columns": [
-        "customer_id"
-      ],
-      "cardinality": "zero_or_more",
-      "parent_table": "public.customer",
-      "parent_columns": [
-        "id"
-      ],
-      "parent_cardinality": "exactly_one",
-      "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)"
-    },
-    {
-      "table": "public.account",
-      "columns": [
         "type"
       ],
       "cardinality": "zero_or_more",
@@ -1109,6 +1292,19 @@
       ],
       "parent_cardinality": "exactly_one",
       "def": "FOREIGN KEY (type) REFERENCES account_type(id)"
+    },
+    {
+      "table": "public.account",
+      "columns": [
+        "customer_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.customer",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)"
     },
     {
       "table": "public.entry",
@@ -1150,6 +1346,19 @@
       ],
       "parent_cardinality": "exactly_one",
       "def": "FOREIGN KEY (meter, kind_natural_id) REFERENCES resource_kind(meter, natural_id)"
+    },
+    {
+      "table": "public.resource_node",
+      "columns": [
+        "customer_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.customer",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (customer_id) REFERENCES customer(id)"
     }
   ],
   "functions": [
@@ -1175,6 +1384,492 @@
       "name": "public.post_usage",
       "return_type": "int4",
       "arguments": "as_of timestamp with time zone DEFAULT now()",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.uuid_generate_v7",
+      "return_type": "uuid",
+      "arguments": "",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_in",
+      "return_type": "ltree",
+      "arguments": "cstring",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_out",
+      "return_type": "cstring",
+      "arguments": "ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_cmp",
+      "return_type": "int4",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_lt",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_le",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_eq",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_ge",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_gt",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_ne",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.subltree",
+      "return_type": "ltree",
+      "arguments": "ltree, integer, integer",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.subpath",
+      "return_type": "ltree",
+      "arguments": "ltree, integer, integer",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.subpath",
+      "return_type": "ltree",
+      "arguments": "ltree, integer",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.index",
+      "return_type": "int4",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.index",
+      "return_type": "int4",
+      "arguments": "ltree, ltree, integer",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.nlevel",
+      "return_type": "int4",
+      "arguments": "ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree2text",
+      "return_type": "text",
+      "arguments": "ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.text2ltree",
+      "return_type": "ltree",
+      "arguments": "text",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree, ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree, ltree, ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lca",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree, ltree, ltree, ltree, ltree, ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_isparent",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_risparent",
+      "return_type": "bool",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_addltree",
+      "return_type": "ltree",
+      "arguments": "ltree, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_addtext",
+      "return_type": "ltree",
+      "arguments": "ltree, text",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_textadd",
+      "return_type": "ltree",
+      "arguments": "text, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltreeparentsel",
+      "return_type": "float8",
+      "arguments": "internal, oid, internal, integer",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lquery_in",
+      "return_type": "lquery",
+      "arguments": "cstring",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lquery_out",
+      "return_type": "cstring",
+      "arguments": "lquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltq_regex",
+      "return_type": "bool",
+      "arguments": "ltree, lquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltq_rregex",
+      "return_type": "bool",
+      "arguments": "lquery, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lt_q_regex",
+      "return_type": "bool",
+      "arguments": "ltree, lquery[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lt_q_rregex",
+      "return_type": "bool",
+      "arguments": "lquery[], ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_in",
+      "return_type": "ltxtquery",
+      "arguments": "cstring",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_out",
+      "return_type": "cstring",
+      "arguments": "ltxtquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_exec",
+      "return_type": "bool",
+      "arguments": "ltree, ltxtquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_rexec",
+      "return_type": "bool",
+      "arguments": "ltxtquery, ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_gist_in",
+      "return_type": "ltree_gist",
+      "arguments": "cstring",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_gist_out",
+      "return_type": "cstring",
+      "arguments": "ltree_gist",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_consistent",
+      "return_type": "bool",
+      "arguments": "internal, ltree, smallint, oid, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_compress",
+      "return_type": "internal",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_decompress",
+      "return_type": "internal",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_penalty",
+      "return_type": "internal",
+      "arguments": "internal, internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_picksplit",
+      "return_type": "internal",
+      "arguments": "internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_union",
+      "return_type": "ltree_gist",
+      "arguments": "internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_same",
+      "return_type": "internal",
+      "arguments": "ltree_gist, ltree_gist, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_isparent",
+      "return_type": "bool",
+      "arguments": "ltree[], ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_r_isparent",
+      "return_type": "bool",
+      "arguments": "ltree, ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_risparent",
+      "return_type": "bool",
+      "arguments": "ltree[], ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_r_risparent",
+      "return_type": "bool",
+      "arguments": "ltree, ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltq_regex",
+      "return_type": "bool",
+      "arguments": "ltree[], lquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltq_rregex",
+      "return_type": "bool",
+      "arguments": "lquery, ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._lt_q_regex",
+      "return_type": "bool",
+      "arguments": "ltree[], lquery[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._lt_q_rregex",
+      "return_type": "bool",
+      "arguments": "lquery[], ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltxtq_exec",
+      "return_type": "bool",
+      "arguments": "ltree[], ltxtquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltxtq_rexec",
+      "return_type": "bool",
+      "arguments": "ltxtquery, ltree[]",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_extract_isparent",
+      "return_type": "ltree",
+      "arguments": "ltree[], ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_extract_risparent",
+      "return_type": "ltree",
+      "arguments": "ltree[], ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltq_extract_regex",
+      "return_type": "ltree",
+      "arguments": "ltree[], lquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltxtq_extract_exec",
+      "return_type": "ltree",
+      "arguments": "ltree[], ltxtquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_consistent",
+      "return_type": "bool",
+      "arguments": "internal, ltree[], smallint, oid, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_compress",
+      "return_type": "internal",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_penalty",
+      "return_type": "internal",
+      "arguments": "internal, internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_picksplit",
+      "return_type": "internal",
+      "arguments": "internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_union",
+      "return_type": "ltree_gist",
+      "arguments": "internal, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_same",
+      "return_type": "internal",
+      "arguments": "ltree_gist, ltree_gist, internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_recv",
+      "return_type": "ltree",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_send",
+      "return_type": "bytea",
+      "arguments": "ltree",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lquery_recv",
+      "return_type": "lquery",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.lquery_send",
+      "return_type": "bytea",
+      "arguments": "lquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_recv",
+      "return_type": "ltxtquery",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltxtq_send",
+      "return_type": "bytea",
+      "arguments": "ltxtquery",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.ltree_gist_options",
+      "return_type": "void",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public._ltree_gist_options",
+      "return_type": "void",
+      "arguments": "internal",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.move_customer",
+      "return_type": "bool",
+      "arguments": "p_customer_id uuid, p_new_parent_id uuid",
+      "type": "FUNCTION"
+    },
+    {
+      "name": "public.move_resource_node",
+      "return_type": "bool",
+      "arguments": "p_resource_node_id uuid, p_new_parent_id uuid",
       "type": "FUNCTION"
     }
   ],
@@ -1203,7 +1898,7 @@
   ],
   "driver": {
     "name": "postgres",
-    "database_version": "PostgreSQL 15.14 (Debian 15.14-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "database_version": "PostgreSQL 15.15 (Debian 15.15-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
     "meta": {
       "current_schema": "public",
       "search_paths": [

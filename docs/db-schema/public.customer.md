@@ -6,44 +6,63 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | bigint | nextval('customer_id_seq'::regclass) | false | [public.cf_org](public.cf_org.md) [public.account](public.account.md) |  |  |
+| old_id | bigint | nextval('customer_id_seq'::regclass) | false |  |  |  |
 | name | text |  | false |  |  |  |
 | tier_id | integer |  | true |  | [public.tier](public.tier.md) |  |
+| id | uuid | uuid_generate_v7() | false | [public.cf_org](public.cf_org.md) [public.account](public.account.md) [public.resource_node](public.resource_node.md) |  |  |
+| path | ltree |  | true |  |  |  |
+| slug | varchar(256) |  | true |  |  |  |
 
 ## Constraints
 
 | Name | Type | Definition |
 | ---- | ---- | ---------- |
+| valid_path | CHECK | CHECK (((path)::text ~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$'::text)) |
 | fk_tier_id | FOREIGN KEY | FOREIGN KEY (tier_id) REFERENCES tier(id) |
+| customer_new_id_key | UNIQUE | UNIQUE (id) |
 | customer_pkey | PRIMARY KEY | PRIMARY KEY (id) |
+| customer_old_id_key | UNIQUE | UNIQUE (old_id) |
 
 ## Indexes
 
 | Name | Definition |
 | ---- | ---------- |
+| customer_new_id_key | CREATE UNIQUE INDEX customer_new_id_key ON public.customer USING btree (id) |
 | customer_pkey | CREATE UNIQUE INDEX customer_pkey ON public.customer USING btree (id) |
+| customer_old_id_key | CREATE UNIQUE INDEX customer_old_id_key ON public.customer USING btree (old_id) |
+| customer_path_gist_idx | CREATE INDEX customer_path_gist_idx ON public.customer USING gist (path) |
+| customer_path_btree_idx | CREATE INDEX customer_path_btree_idx ON public.customer USING btree (path) |
 
 ## Relations
 
 ```mermaid
 erDiagram
 
+"public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
 "public.cf_org" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 "public.resource" }o--|| "public.cf_org" : "FOREIGN KEY (cf_org_id) REFERENCES cf_org(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 "public.entry" }o--|| "public.account" : "FOREIGN KEY (account_id) REFERENCES account(id)"
 "public.account" }o--|| "public.account_type" : "FOREIGN KEY (type) REFERENCES account_type(id)"
-"public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
+"public.resource_node" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
+  uuid id
+  ltree path
+  varchar_256_ slug
+}
+"public.tier" {
+  integer id
+  text name
+  bigint tier_credits
 }
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.resource" {
   text meter FK
@@ -53,8 +72,8 @@ erDiagram
 }
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
+  uuid customer_id FK
 }
 "public.entry" {
   integer transaction_id FK
@@ -67,10 +86,11 @@ erDiagram
   text name
   integer normal
 }
-"public.tier" {
-  integer id
-  text name
-  bigint tier_credits
+"public.resource_node" {
+  ltree path
+  varchar_256_ slug
+  uuid customer_id FK
+  text resource_natural_id
 }
 ```
 

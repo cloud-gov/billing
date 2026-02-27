@@ -73,14 +73,14 @@ erDiagram
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.transaction" {
   integer id
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
 }
 "public.entry" {
   integer transaction_id FK

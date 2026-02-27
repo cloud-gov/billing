@@ -7,16 +7,16 @@
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
 | id | integer | nextval('account_id_seq'::regclass) | false | [public.entry](public.entry.md) |  |  |
-| customer_id | bigint |  | false |  | [public.customer](public.customer.md) |  |
 | type | integer |  | false |  | [public.account_type](public.account_type.md) |  |
+| customer_id | uuid |  | true |  | [public.customer](public.customer.md) |  |
 
 ## Constraints
 
 | Name | Type | Definition |
 | ---- | ---- | ---------- |
-| fk_customer_id | FOREIGN KEY | FOREIGN KEY (customer_id) REFERENCES customer(id) |
 | fk_type_id | FOREIGN KEY | FOREIGN KEY (type) REFERENCES account_type(id) |
 | account_pkey | PRIMARY KEY | PRIMARY KEY (id) |
+| fk_customer_id | FOREIGN KEY | FOREIGN KEY (customer_id) REFERENCES customer(id) |
 
 ## Indexes
 
@@ -33,15 +33,16 @@ erDiagram
 
 "public.entry" }o--|| "public.account" : "FOREIGN KEY (account_id) REFERENCES account(id)"
 "public.entry" }o--|| "public.transaction" : "FOREIGN KEY (transaction_id) REFERENCES transaction(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
-"public.cf_org" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
-"public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
 "public.account" }o--|| "public.account_type" : "FOREIGN KEY (type) REFERENCES account_type(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
+"public.cf_org" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.resource_node" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
+  uuid customer_id FK
 }
 "public.entry" {
   integer transaction_id FK
@@ -54,27 +55,36 @@ erDiagram
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
+}
+"public.account_type" {
+  integer id
+  text name
+  integer normal
 }
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
-}
-"public.cf_org" {
   uuid id
-  text name
-  bigint customer_id FK
+  ltree path
+  varchar_256_ slug
 }
 "public.tier" {
   integer id
   text name
   bigint tier_credits
 }
-"public.account_type" {
-  integer id
+"public.cf_org" {
+  uuid id
   text name
-  integer normal
+  uuid customer_id FK
+}
+"public.resource_node" {
+  ltree path
+  varchar_256_ slug
+  uuid customer_id FK
+  text resource_natural_id
 }
 ```
 
