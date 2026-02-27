@@ -40,8 +40,8 @@ erDiagram
 "public.entry" }o--|| "public.transaction" : "FOREIGN KEY (transaction_id) REFERENCES transaction(id)"
 "public.measurement" }o--o| "public.transaction" : "FOREIGN KEY (transaction_id) REFERENCES transaction(id)"
 "public.entry" }o--|| "public.account" : "FOREIGN KEY (account_id) REFERENCES account(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 "public.account" }o--|| "public.account_type" : "FOREIGN KEY (type) REFERENCES account_type(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.entry" {
   integer transaction_id FK
@@ -54,7 +54,7 @@ erDiagram
   timestamp_with_time_zone occurred_at
   text description
   transaction_type type
-  bigint customer_id
+  uuid customer_id
 }
 "public.measurement" {
   integer reading_id FK
@@ -67,18 +67,21 @@ erDiagram
 }
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
-}
-"public.customer" {
-  bigint id
-  text name
-  integer tier_id FK
+  uuid customer_id FK
 }
 "public.account_type" {
   integer id
   text name
   integer normal
+}
+"public.customer" {
+  bigint old_id
+  text name
+  integer tier_id FK
+  uuid id
+  ltree path
+  varchar_256_ slug
 }
 ```
 

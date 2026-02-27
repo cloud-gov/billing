@@ -64,7 +64,7 @@ erDiagram
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.price" {
   integer id

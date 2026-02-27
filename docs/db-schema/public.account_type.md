@@ -30,7 +30,7 @@ erDiagram
 
 "public.account" }o--|| "public.account_type" : "FOREIGN KEY (type) REFERENCES account_type(id)"
 "public.entry" }o--|| "public.account" : "FOREIGN KEY (account_id) REFERENCES account(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.account_type" {
   integer id
@@ -39,8 +39,8 @@ erDiagram
 }
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
+  uuid customer_id FK
 }
 "public.entry" {
   integer transaction_id FK
@@ -49,9 +49,12 @@ erDiagram
   bigint amount_microcredits
 }
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
+  uuid id
+  ltree path
+  varchar_256_ slug
 }
 ```
 

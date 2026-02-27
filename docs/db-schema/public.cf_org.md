@@ -8,14 +8,14 @@
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
 | id | uuid |  | false | [public.resource](public.resource.md) |  |  |
 | name | text |  | true |  |  |  |
-| customer_id | bigint |  | true |  | [public.customer](public.customer.md) |  |
+| customer_id | uuid |  | true |  | [public.customer](public.customer.md) |  |
 
 ## Constraints
 
 | Name | Type | Definition |
 | ---- | ---- | ---------- |
-| fk_customer_id | FOREIGN KEY | FOREIGN KEY (customer_id) REFERENCES customer(id) |
 | cf_org_pkey | PRIMARY KEY | PRIMARY KEY (id) |
+| fk_customer_id | FOREIGN KEY | FOREIGN KEY (customer_id) REFERENCES customer(id) |
 
 ## Indexes
 
@@ -33,13 +33,14 @@ erDiagram
 "public.resource" }o--|| "public.resource_kind" : "FOREIGN KEY (meter, kind_natural_id) REFERENCES resource_kind(meter, natural_id)"
 "public.measurement" }o--|| "public.resource" : "FOREIGN KEY (meter, resource_natural_id) REFERENCES resource(meter, natural_id)"
 "public.cf_org" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 "public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.resource_node" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.resource" {
   text meter FK
@@ -62,19 +63,28 @@ erDiagram
   bigint price_id FK
 }
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
-}
-"public.account" {
-  integer id
-  bigint customer_id FK
-  integer type FK
+  uuid id
+  ltree path
+  varchar_256_ slug
 }
 "public.tier" {
   integer id
   text name
   bigint tier_credits
+}
+"public.account" {
+  integer id
+  integer type FK
+  uuid customer_id FK
+}
+"public.resource_node" {
+  ltree path
+  varchar_256_ slug
+  uuid customer_id FK
+  text resource_natural_id
 }
 ```
 

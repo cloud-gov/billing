@@ -29,7 +29,8 @@ erDiagram
 
 "public.customer" }o--o| "public.tier" : "FOREIGN KEY (tier_id) REFERENCES tier(id)"
 "public.cf_org" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
-"public.account" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.account" }o--o| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
+"public.resource_node" }o--|| "public.customer" : "FOREIGN KEY (customer_id) REFERENCES customer(id)"
 
 "public.tier" {
   integer id
@@ -37,19 +38,28 @@ erDiagram
   bigint tier_credits
 }
 "public.customer" {
-  bigint id
+  bigint old_id
   text name
   integer tier_id FK
+  uuid id
+  ltree path
+  varchar_256_ slug
 }
 "public.cf_org" {
   uuid id
   text name
-  bigint customer_id FK
+  uuid customer_id FK
 }
 "public.account" {
   integer id
-  bigint customer_id FK
   integer type FK
+  uuid customer_id FK
+}
+"public.resource_node" {
+  ltree path
+  varchar_256_ slug
+  uuid customer_id FK
+  text resource_natural_id
 }
 ```
 
