@@ -114,9 +114,10 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: got usage", "usage", nodes)
 
 	logger.Debug("run: making report")
-	slices.Reverse(nodes)
 	report := NewReporter()
 	var link ReportLinker
+
+	slices.Reverse(nodes)
 	for i, n := range nodes {
 		uCreds, err := n.TotalMicrocredits.Int64Value()
 		if err != nil {
@@ -131,10 +132,20 @@ func run(ctx context.Context, out io.Writer) error {
 
 		p := nodes[i-1]
 
+		paths := []string{}
+		levels := []pgtype.Text{n.L1, n.L2, n.L3, n.L4}
+		for _, l := range levels {
+			if !l.Valid {
+				break
+			}
+			paths = append(paths, l.String)
+		}
+		path := strings.Join(paths, ".")
+
 		// org
 		if n.L1.Valid && !n.L2.Valid {
 			// org is always linked to root
-			link, err = report.SetNode(report, uCredsInt, Org, n.L1.String, "")
+			link, err = report.SetNode(report, uCredsInt, Org, n.L1.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -150,7 +161,7 @@ func run(ctx context.Context, out io.Writer) error {
 			} else if p.L2.Valid { // go space/g > org
 				link = link.getParent()
 			}
-			link, err = report.SetNode(link, uCredsInt, Space, n.L2.String, "")
+			link, err = report.SetNode(link, uCredsInt, Space, n.L2.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -164,7 +175,7 @@ func run(ctx context.Context, out io.Writer) error {
 			} else if p.L3.Valid { // go space/s > space/g
 				link = link.getParent()
 			}
-			link, err = report.SetNode(link, uCredsInt, Space, n.L3.String, "")
+			link, err = report.SetNode(link, uCredsInt, Space, n.L3.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -183,7 +194,7 @@ func run(ctx context.Context, out io.Writer) error {
 				k = CfSvc
 			}
 
-			link, err = report.SetNode(link, uCredsInt, k, n.L4.String, "")
+			link, err = report.SetNode(link, uCredsInt, k, n.L4.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
