@@ -202,7 +202,6 @@ func run(ctx context.Context, out io.Writer) error {
 		}
 
 		logger.Debug("weirds gotten in report", "node", n)
-
 	}
 	logger.Debug("run: got report", "report", report)
 

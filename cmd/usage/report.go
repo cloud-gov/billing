@@ -38,14 +38,21 @@ const (
 var meterReg = regexp.MustCompile(`^meter::(\w+)`)
 
 func (k Kind) String() string {
+	if k.isMeter() {
+		return k.meterName()
+	}
+	return string(k)
+}
+
+func (k Kind) StringRaw() string {
 	return string(k)
 }
 
 func (k Kind) isMeter() bool {
-	res := meterReg.MatchString(k.String())
+	res := meterReg.MatchString(k.StringRaw())
 	return res
 }
 
 func (k Kind) meterName() string {
-	return meterReg.FindStringSubmatch(k.String())[0]
+	return meterReg.FindStringSubmatch(k.StringRaw())[0]
 }

@@ -4,28 +4,29 @@ import "fmt"
 
 type (
 	Report struct {
-		UCreditSum int
+		UCreditSum int `json:"microcredit_sum"`
 		ReportLink
 		ReportWriter
 	}
 	ReportNode struct {
-		Path       string
-		Slug       string
-		Kind       string
-		UCreditSum int
-		Meters     []*ReportLeaf
+		UCreditSum int           `json:"microcredit_sum"`
+		Meters     []*ReportLeaf `json:",omitempty"`
 		ReportLink
 	}
 	ReportLeaf struct {
-		Kind       string
-		UCreditUse int
+		UCreditUse int `json:"microcredit_use"`
 		ReportLink
 	}
 	ReportLink struct {
-		parent ReportLinker
-		root   *Report
-		Nodes  []*ReportNode
-		ReportLinker
+		ReportLinker `json:"-"`
+
+		root   *Report      `json:"-"`
+		parent ReportLinker `json:"-"`
+
+		Slug  string
+		Path  string
+		Kind  string
+		Nodes []*ReportNode `json:",omitempty"`
 	}
 )
 
@@ -65,23 +66,34 @@ func (rl *ReportLink) setParent(r ReportLinker)    { rl.parent = r }
 func (r *Report) SetNode(link ReportLinker, uCredits int, kind any, name, path string) (ReportLinker, error) {
 	var rp rootParenter
 
-	if kk, ok := kind.(Kind); ok && kk.isMeter() { // this could also be implicit by excluding a name & path?
-		rp = &ReportLeaf{Kind: kk.meterName(), UCreditUse: uCredits}
-	} else if ok {
-		rp = &ReportNode{Kind: kk.String(), UCreditSum: uCredits, Slug: name, Path: path}
-	} else if ks, ok := kind.(string); ok {
-		rp = &ReportNode{Kind: ks, UCreditSum: uCredits, Slug: name, Path: path}
-	} else {
+	var isLeaf bool
+	var stKind string
+
+	switch k := kind.(type) {
+	case Kind:
+		isLeaf = k.isMeter()
+		stKind = k.String()
+	case string:
+		stKind = k
+	default:
 		return nil, fmt.Errorf("Report SetNode: kind must be stringable, got: %T", kind)
 	}
 
-	rl := rp.(ReportLinker)
-	link.addChild(rl)
+	rl := ReportLink{Kind: stKind, Slug: name, Path: path}
+
+	if isLeaf {
+		rp = &ReportLeaf{UCreditUse: uCredits, ReportLink: rl}
+	} else {
+		rp = &ReportNode{UCreditSum: uCredits, ReportLink: rl}
+	}
+
+	linker := rp.(ReportLinker)
+	link.addChild(linker)
 
 	rp.setRoot(r)
 	rp.setParent(link)
 
-	return rl, nil
+	return linker, nil
 }
 
 func NewReporter() *Report {
