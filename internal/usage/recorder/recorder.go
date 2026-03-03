@@ -98,7 +98,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	logger.Debug("creating resource nodes in database")
 	err = q.BulkCreateResourceNodes(ctx, dbResourceNodes)
 	if err != nil {
-		return err
+		logger.Error("error in q.BulkCreateResourceNodes", "error", err)
 	}
 	logger.Debug("creating measurements in database")
 	// TODO: For some reason, using q.CreateMeasurements, which is implemented with a COPY, does not work here. It works fine for /usage/app/{guid}.
