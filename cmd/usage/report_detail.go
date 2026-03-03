@@ -6,11 +6,11 @@ type (
 	Report struct {
 		UCreditSum int `json:"microcredit_sum"`
 		ReportLink
-		ReportWriter
+		ReportWriter `json:"-"`
 	}
 	ReportNode struct {
 		UCreditSum int           `json:"microcredit_sum"`
-		Meters     []*ReportLeaf `json:",omitempty"`
+		Meters     []*ReportLeaf `json:"meters,omitempty"`
 		ReportLink
 	}
 	ReportLeaf struct {
@@ -23,10 +23,10 @@ type (
 		root   *Report      `json:"-"`
 		parent ReportLinker `json:"-"`
 
-		Slug  string
-		Path  string
-		Kind  string
-		Nodes []*ReportNode `json:",omitempty"`
+		Slug  string        `json:"slug,omitempty"`
+		Path  string        `json:"path,omitempty"`
+		Kind  string        `json:"kind,omitempty"`
+		Nodes []*ReportNode `json:"nodes,omitempty"`
 	}
 )
 
