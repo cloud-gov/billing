@@ -182,19 +182,22 @@ func run(ctx context.Context, out io.Writer) error {
 			continue
 		}
 
+		// TODO: we don't currently have the individual meters attached here
+		// - There aren't currently more than one meter per resource anyway
+		// - See cloud-gov/cg-interface/cg-billing#89
 		if n.L4.Valid {
 			if p.L4.Valid { // go from leaf > space/s
 				link = link.getParent()
 			}
 
-			var k Kind
+			var kind Kind
 			if isApp(n.L4) {
-				k = CfApp
+				kind = CfApp
 			} else if isService(n.L4) {
-				k = CfSvc
+				kind = CfSvc
 			}
 
-			link, err = report.SetNode(link, uCredsInt, k, n.L4.String, path)
+			link, err = report.SetNode(link, uCredsInt, kind, n.L4.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}

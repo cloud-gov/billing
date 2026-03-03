@@ -65,13 +65,13 @@ func (rl *ReportLink) setParent(r ReportLinker)    { rl.parent = r }
 
 func (r *Report) SetNode(link ReportLinker, uCredits int, kind any, name, path string) (ReportLinker, error) {
 	var rp rootParenter
-
-	var isLeaf bool
 	var stKind string
 
+	// TODO: meters/leaves are not currently attached
+	// - These are really just the branch tips
+	// - See cloud-gov/cg-interface/cg-billing#89
 	switch k := kind.(type) {
 	case Kind:
-		isLeaf = k.isMeter()
 		stKind = k.String()
 	case string:
 		stKind = k
@@ -79,12 +79,9 @@ func (r *Report) SetNode(link ReportLinker, uCredits int, kind any, name, path s
 		return nil, fmt.Errorf("Report SetNode: kind must be stringable, got: %T", kind)
 	}
 
-	rl := ReportLink{Kind: stKind, Slug: name, Path: path}
-
-	if isLeaf {
-		rp = &ReportLeaf{UCreditUse: uCredits, ReportLink: rl}
-	} else {
-		rp = &ReportNode{UCreditSum: uCredits, ReportLink: rl}
+	rp = &ReportNode{
+		UCreditSum: uCredits,
+		ReportLink: ReportLink{Kind: stKind, Slug: name, Path: path},
 	}
 
 	linker := rp.(ReportLinker)

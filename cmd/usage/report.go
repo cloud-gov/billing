@@ -31,8 +31,8 @@ type Kind string
 const (
 	Org   Kind = "cf_org"
 	Space Kind = "cf_space"
-	CfApp Kind = "meter::cfapps"
-	CfSvc Kind = "meter::cfservices"
+	CfApp Kind = "cf_app"
+	CfSvc Kind = "cf_service"
 )
 
 var meterReg = regexp.MustCompile(`^meter::(\w+)`)
