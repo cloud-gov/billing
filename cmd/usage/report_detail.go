@@ -4,28 +4,29 @@ import "fmt"
 
 type (
 	Report struct {
-		UCreditSum int
+		UCreditSum int `json:"microcredit_sum"`
 		ReportLink
-		ReportWriter
+		ReportWriter `json:"-"`
 	}
 	ReportNode struct {
-		Path       string
-		Slug       string
-		Kind       string
-		UCreditSum int
-		Meters     []*ReportLeaf
+		UCreditSum int           `json:"microcredit_sum"`
+		Meters     []*ReportLeaf `json:"meters,omitempty"`
 		ReportLink
 	}
 	ReportLeaf struct {
-		Kind       string
-		UCreditUse int
+		UCreditUse int `json:"microcredit_use"`
 		ReportLink
 	}
 	ReportLink struct {
-		parent ReportLinker
-		root   *Report
-		Nodes  []*ReportNode
-		ReportLinker
+		ReportLinker `json:"-"`
+
+		root   *Report      `json:"-"`
+		parent ReportLinker `json:"-"`
+
+		Slug  string        `json:"slug,omitempty"`
+		Path  string        `json:"path,omitempty"`
+		Kind  string        `json:"kind,omitempty"`
+		Nodes []*ReportNode `json:"nodes,omitempty"`
 	}
 )
 
@@ -64,24 +65,32 @@ func (rl *ReportLink) setParent(r ReportLinker)    { rl.parent = r }
 
 func (r *Report) SetNode(link ReportLinker, uCredits int, kind any, name, path string) (ReportLinker, error) {
 	var rp rootParenter
+	var stKind string
 
-	if kk, ok := kind.(Kind); ok && kk.isMeter() { // this could also be implicit by excluding a name & path?
-		rp = &ReportLeaf{Kind: kk.meterName(), UCreditUse: uCredits}
-	} else if ok {
-		rp = &ReportNode{Kind: kk.String(), UCreditSum: uCredits, Slug: name, Path: path}
-	} else if ks, ok := kind.(string); ok {
-		rp = &ReportNode{Kind: ks, UCreditSum: uCredits, Slug: name, Path: path}
-	} else {
+	// TODO: meters/leaves are not currently attached
+	// - These are really just the branch tips
+	// - See cloud-gov/cg-interface/cg-billing#89
+	switch k := kind.(type) {
+	case Kind:
+		stKind = k.String()
+	case string:
+		stKind = k
+	default:
 		return nil, fmt.Errorf("Report SetNode: kind must be stringable, got: %T", kind)
 	}
 
-	rl := rp.(ReportLinker)
-	link.addChild(rl)
+	rp = &ReportNode{
+		UCreditSum: uCredits,
+		ReportLink: ReportLink{Kind: stKind, Slug: name, Path: path},
+	}
+
+	linker := rp.(ReportLinker)
+	link.addChild(linker)
 
 	rp.setRoot(r)
 	rp.setParent(link)
 
-	return rl, nil
+	return linker, nil
 }
 
 func NewReporter() *Report {

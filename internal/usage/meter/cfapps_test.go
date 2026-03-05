@@ -2,6 +2,7 @@ package meter_test
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"testing"
@@ -64,7 +65,7 @@ func mkSpace(guid, orgGUID string) *resource.Space {
 
 // measurementsToMap converts the slice the function returns into a
 // map[appGUID]usage, ignoring zero‑value entries.
-func measurementsToMap(ms []reader.Measurement) map[string]int {
+func measurementsToMap(ms []*reader.Measurement) map[string]int {
 	out := map[string]int{}
 	for _, m := range ms {
 		if m.ResourceNaturalID != "" {
@@ -74,7 +75,7 @@ func measurementsToMap(ms []reader.Measurement) map[string]int {
 	return out
 }
 
-func measurementErrsToMap(ms []reader.Measurement) map[string]error {
+func measurementErrsToMap(ms []*reader.Measurement) map[string]error {
 	out := map[string]error{}
 	for _, m := range ms {
 		if m.ResourceNaturalID != "" {
@@ -101,6 +102,7 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 		procs              []*resource.Process
 		apps               []*resource.App
 		spaces             []*resource.Space
+		orgs               []*resource.Organization
 		procErr            error
 		appErr             error
 		want               map[string]int // expected aggregated usage by app GUID
@@ -201,15 +203,17 @@ func TestCFAppMeter_ReadUsage(t *testing.T) {
 				}
 			}()
 
+			fmt.Println("new meter")
 			sut := meter.NewCFAppMeter(
 				slog.Default(),
 				&MockAppMeterCfProvider{
-					Apps: tc.apps, Spaces: tc.spaces, AppErr: tc.appErr,
+					Apps: tc.apps, Spaces: tc.spaces, Orgs: tc.orgs, AppErr: tc.appErr,
 					Processes: tc.procs, ProcErr: tc.procErr,
 				},
 				&StubDbQ{},
 			)
 
+			fmt.Println("read usage")
 			got, _, err := sut.ReadUsage(t.Context())
 			if tc.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")

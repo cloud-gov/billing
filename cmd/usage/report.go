@@ -31,21 +31,28 @@ type Kind string
 const (
 	Org   Kind = "cf_org"
 	Space Kind = "cf_space"
-	CfApp Kind = "meter::cfapps"
-	CfSvc Kind = "meter::cfservices"
+	CfApp Kind = "cf_app"
+	CfSvc Kind = "cf_service"
 )
 
 var meterReg = regexp.MustCompile(`^meter::(\w+)`)
 
 func (k Kind) String() string {
+	if k.isMeter() {
+		return k.meterName()
+	}
+	return string(k)
+}
+
+func (k Kind) StringRaw() string {
 	return string(k)
 }
 
 func (k Kind) isMeter() bool {
-	res := meterReg.MatchString(k.String())
+	res := meterReg.MatchString(k.StringRaw())
 	return res
 }
 
 func (k Kind) meterName() string {
-	return meterReg.FindStringSubmatch(k.String())[0]
+	return meterReg.FindStringSubmatch(k.StringRaw())[0]
 }

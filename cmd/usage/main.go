@@ -114,9 +114,10 @@ func run(ctx context.Context, out io.Writer) error {
 	logger.Debug("run: got usage", "usage", nodes)
 
 	logger.Debug("run: making report")
-	slices.Reverse(nodes)
 	report := NewReporter()
 	var link ReportLinker
+
+	slices.Reverse(nodes)
 	for i, n := range nodes {
 		uCreds, err := n.TotalMicrocredits.Int64Value()
 		if err != nil {
@@ -131,10 +132,20 @@ func run(ctx context.Context, out io.Writer) error {
 
 		p := nodes[i-1]
 
+		paths := []string{}
+		levels := []pgtype.Text{n.L1, n.L2, n.L3, n.L4}
+		for _, l := range levels {
+			if !l.Valid {
+				break
+			}
+			paths = append(paths, l.String)
+		}
+		path := strings.Join(paths, ".")
+
 		// org
 		if n.L1.Valid && !n.L2.Valid {
 			// org is always linked to root
-			link, err = report.SetNode(report, uCredsInt, Org, n.L1.String, "")
+			link, err = report.SetNode(report, uCredsInt, Org, n.L1.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -150,7 +161,7 @@ func run(ctx context.Context, out io.Writer) error {
 			} else if p.L2.Valid { // go space/g > org
 				link = link.getParent()
 			}
-			link, err = report.SetNode(link, uCredsInt, Space, n.L2.String, "")
+			link, err = report.SetNode(link, uCredsInt, Space, n.L2.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -164,26 +175,29 @@ func run(ctx context.Context, out io.Writer) error {
 			} else if p.L3.Valid { // go space/s > space/g
 				link = link.getParent()
 			}
-			link, err = report.SetNode(link, uCredsInt, Space, n.L3.String, "")
+			link, err = report.SetNode(link, uCredsInt, Space, n.L3.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
 			continue
 		}
 
+		// TODO: we don't currently have the individual meters attached here
+		// - There aren't currently more than one meter per resource anyway
+		// - See cloud-gov/cg-interface/cg-billing#89
 		if n.L4.Valid {
 			if p.L4.Valid { // go from leaf > space/s
 				link = link.getParent()
 			}
 
-			var k Kind
+			var kind Kind
 			if isApp(n.L4) {
-				k = CfApp
+				kind = CfApp
 			} else if isService(n.L4) {
-				k = CfSvc
+				kind = CfSvc
 			}
 
-			link, err = report.SetNode(link, uCredsInt, k, n.L4.String, "")
+			link, err = report.SetNode(link, uCredsInt, kind, n.L4.String, path)
 			if err != nil {
 				return fmtErr(ErrCreatingReport, err)
 			}
@@ -191,7 +205,6 @@ func run(ctx context.Context, out io.Writer) error {
 		}
 
 		logger.Debug("weirds gotten in report", "node", n)
-
 	}
 	logger.Debug("run: got report", "report", report)
 
@@ -240,7 +253,7 @@ func buildQuery() string {
 func getCustomerID(ctx context.Context, q dbx.Querier) (id pgtype.UUID, err error) {
 	r := getRawCID()
 	if r != "" {
-		return dbx.UtilUUID(r), nil
+		return dbx.ToUUID(r), nil
 	}
 
 	cs, e := q.GetCustomersByName(ctx, cname)

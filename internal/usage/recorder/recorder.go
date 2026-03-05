@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbx"
@@ -22,7 +21,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	logger.Debug("creating reading in database")
 
 	dbReading, err := q.CreateUniqueReading(ctx, db.CreateUniqueReadingParams{
-		CreatedAt: dbx.UtilTimestamp(r.Time),
+		CreatedAt: dbx.TimeToTimestamp(r.Time),
 		Periodic:  periodic,
 	})
 	if err != nil {
@@ -34,7 +33,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	}
 
 	dbMeters := []string{}
-	dbCFOrgs := []pgtype.UUID{}
+	dbCFOrgs := db.BulkCreateCFOrgsParams{}
 	dbKinds := db.BulkCreateResourceKindsParams{}
 	dbResources := db.BulkCreateResourcesParams{}
 	dbResourceNodes := db.BulkCreateResourceNodesParams{}
@@ -51,10 +50,11 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 
 		// We may insert thousands of rows at a time. We only want to insert if a row does not already exist. COPY does not support ON CONFLICT, running an INSERT in a loop is inefficient, and sqlc does not support variable-length INSERTs. As a workaround we write INSERT queries that accept arrays, with one array per column where appropriate.
 		dbMeters = append(dbMeters, m.Meter)
-		dbCFOrgs = append(dbCFOrgs, dbx.UtilUUID(m.OrgID))
+		dbCFOrgs.Ids = append(dbCFOrgs.Ids, dbx.ToUUID(m.OrgID))
+		dbCFOrgs.Names = append(dbCFOrgs.Names, m.OrgName)
 		dbKinds.Meters = append(dbKinds.Meters, m.Meter)
 		dbKinds.NaturalIds = append(dbKinds.NaturalIds, m.ResourceKindNaturalID)
-		dbResources.CfOrgIds = append(dbResources.CfOrgIds, dbx.UtilUUID(m.OrgID))
+		dbResources.CfOrgIds = append(dbResources.CfOrgIds, dbx.ToUUID(m.OrgID))
 		dbResources.KindNaturalIds = append(dbResources.KindNaturalIds, m.ResourceKindNaturalID)
 		dbResources.Meters = append(dbResources.Meters, m.Meter)
 		dbResources.NaturalIds = append(dbResources.NaturalIds, m.ResourceNaturalID)
@@ -98,7 +98,7 @@ func RecordReading(ctx context.Context, logger *slog.Logger, q db.Querier, r rea
 	logger.Debug("creating resource nodes in database")
 	err = q.BulkCreateResourceNodes(ctx, dbResourceNodes)
 	if err != nil {
-		return err
+		logger.Error("error in q.BulkCreateResourceNodes", "error", err)
 	}
 	logger.Debug("creating measurements in database")
 	// TODO: For some reason, using q.CreateMeasurements, which is implemented with a COPY, does not work here. It works fine for /usage/app/{guid}.

@@ -49,7 +49,7 @@ func (m *CFAppMeter) Name() string {
 	return "cfapps"
 }
 
-func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*node.Node, error) {
+func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "app meter: listing processes")
 	procs, err := m.client.ProcessesList(ctx, client.NewProcessOptions())
 	if err != nil {
@@ -58,12 +58,12 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 
 	m.logger.DebugContext(ctx, "app meter: listing apps")
 	appOpts := client.NewAppListOptions() // For fast troubleshooting, set .GUIDs to an app GUID.
-	apps, spaces, err := m.client.AppsListWithSpaces(ctx, appOpts)
+	apps, spaces, orgs, err := m.client.AppsListWithSpacesAndOrgs(ctx, appOpts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ReadUsage: listing apps w/ spaces: %w", err)
 	}
 
-	measurements := []reader.Measurement{}
+	measurements := []*reader.Measurement{}
 	nodes := []*node.Node{}
 
 	// Aggregate process usage info by app.
@@ -81,21 +81,22 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 			continue
 		}
 
-		msrmt := reader.Measurement{
+		msrmt := &reader.Measurement{
 			Meter:             m.Name(),
 			ResourceNaturalID: app.GUID,
 			Value:             appUsage[app.GUID], // In MB. TODO: make sure units align.
 		}
+		measurements = append(measurements, msrmt)
 
 		spaceGUID := app.Relationships.Space.Data.GUID
-
 		sidx := slices.IndexFunc(spaces, func(s *resource.Space) bool {
 			return s.GUID == spaceGUID
 		})
+
 		if sidx < 0 {
 			msrmt.Errs = errors.Join(msrmt.Errs, ErrSpaceNotFound)
 			appNode, err := node.New(
-				nil,
+				"",
 				app.GUID,
 				node.WithSlugAuto("app", app.Name),
 				node.WithPathAuto("orphan"),
@@ -105,53 +106,61 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*no
 			}
 
 			nodes = append(nodes, []*node.Node{appNode}...)
-		} else {
-			cfOrgGUIDString := spaces[sidx].Relationships.Organization.Data.GUID
-			cfOrgGUID := dbx.UtilUUID(cfOrgGUIDString)
-
-			org, err := m.dbq.GetCFOrg(ctx, cfOrgGUID)
-			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return nil, nil, fmt.Errorf("ReadUsage: getting org: %w", err)
-			}
-
-			customerID := org.CustomerID
-			msrmt.CustomerID = customerID
-			msrmt.OrgID = cfOrgGUIDString
-
-			cfOrgNode, err := node.New(
-				customerID,
-				cfOrgGUIDString,
-				node.WithSlugAuto("cforg", org.Name.String),
-				node.WithPathAuto("apps.usage"),
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf("ReadUsage: creating org node: %w", err)
-			}
-
-			spaceNode, err := node.New(
-				customerID,
-				spaceGUID,
-				node.WithSlugAuto("space", spaces[sidx].Name),
-				node.WithPathByParent(cfOrgNode),
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf("ReadUsage: creating space node: %w", err)
-			}
-
-			appNode, err := node.New(
-				customerID,
-				app.GUID,
-				node.WithSlugAuto("app", app.Name),
-				node.WithPathByParent(spaceNode),
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf("ReadUsage: creating app node: %w", err)
-			}
-
-			nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, appNode}...)
+			return measurements, nodes, nil
 		}
 
-		measurements = append(measurements, msrmt)
+		var org *resource.Organization
+		var orgName string
+		orgID := spaces[sidx].Relationships.Organization.Data.GUID
+		orgIdx := slices.IndexFunc(orgs, func(o *resource.Organization) bool {
+			return o.GUID == orgID
+		})
+		if orgIdx >= 0 && len(orgs) > orgIdx {
+			org = orgs[orgIdx]
+			orgName = org.Name
+		}
+
+		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.ToUUID(orgID))
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, fmt.Errorf("ReadUsage: getting org: %w", err)
+		}
+		customerID := dbOrg.CustomerID
+
+		msrmt.CustomerID = customerID
+		msrmt.OrgID = orgID
+		msrmt.OrgName = orgName
+
+		cfOrgNode, err := node.New(
+			customerID,
+			orgID,
+			node.WithSlugAuto("cforg", orgName),
+			node.WithPathAuto("apps.usage"),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ReadUsage: creating org node: %w", err)
+		}
+
+		spaceNode, err := node.New(
+			customerID,
+			spaceGUID,
+			node.WithSlugAuto("space", spaces[sidx].Name),
+			node.WithPathByParent(cfOrgNode),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ReadUsage: creating space node: %w", err)
+		}
+
+		appNode, err := node.New(
+			customerID,
+			app.GUID,
+			node.WithSlugAuto("app", app.Name),
+			node.WithPathByParent(spaceNode),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ReadUsage: creating app node: %w", err)
+		}
+
+		nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, appNode}...)
 	}
 
 	return measurements, nodes, nil

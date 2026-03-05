@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cloud-gov/billing/internal/db"
+	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/usage/node"
 	"github.com/cloud-gov/billing/internal/usage/reader"
 )
@@ -42,7 +43,7 @@ func (m *CFServiceMeter) Name() string {
 
 // ReadUsage returns the point-in-time usage of services in Cloud Foundry.
 // Returns a non-nil error if there was an error during the overall process of reading usage information from the target system. If individual readings had errors, their errs fields should be set.
-func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*node.Node, error) {
+func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "service meter: listing services")
 	opts := client.NewServiceInstanceListOptions()
 	// Ignore user-provided services, which we do not bill for. IMPORTANT: If this is not set, user-provided services will be included. Some response fields that we assume are non-nil, like .Relationships, will be nil on user-provided services. The code below does not guard against this and will panic.
@@ -69,33 +70,45 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 
 	m.logger.DebugContext(ctx, "service meter: listing spaces")
 	spaceopts := client.NewSpaceListOptions()
-	spaces, err := m.client.SpacesList(ctx, spaceopts)
+	spaces, orgs, err := m.client.SpacesListWithOrgs(ctx, spaceopts)
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO: should maybe just use an indexer?
-	spaceMap := make(map[string]*resource.Space, len(spaces))
-	for _, s := range spaces {
-		spaceMap[s.GUID] = s
-	}
 
-	spacesToOrgs := make(map[string]*db.CFOrg, len(spaces))
-	for _, space := range spaces {
-		orgID := pgtype.UUID{}
-		if err := orgID.Scan(space.Relationships.Organization.Data.GUID); err != nil {
-			return nil, nil, err
-		}
-		org, err := m.dbq.GetCFOrg(ctx, orgID)
+	type spaceMapItem struct {
+		space *resource.Space
+		org   *resource.Organization
+		dbOrg db.CFOrg
+	}
+	spaceMap := make(map[string]spaceMapItem, len(spaces))
+	for i, s := range spaces {
+		smi := spaceMapItem{}
+		smi.space = s
+		spaceMap[s.GUID] = smi
+		relOrgID := s.Relationships.Organization.Data.GUID
+
+		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.ToUUID(relOrgID))
 		if err != nil {
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return nil, nil, err
 			}
-			org.ID = orgID // still get an ID if not in our DB
 		}
-		spacesToOrgs[space.GUID] = &org
+		smi.dbOrg = dbOrg
+
+		if len(orgs) <= i {
+			continue
+		}
+		smi.org = orgs[i]
+		if smi.org.GUID != relOrgID {
+			m.logger.Error("error: org indices do not match space indices!!",
+				"idx", i,
+				"relOrgID", relOrgID,
+				"smiOrgID", smi.org.GUID)
+			smi.org = nil
+		}
 	}
 
-	usage := make([]reader.Measurement, len(si))
+	usage := make([]*reader.Measurement, len(si))
 	nodes := make([]*node.Node, 0, len(si)*3)
 
 	m.logger.DebugContext(ctx, "service meter: aggregating services")
@@ -104,14 +117,24 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 		offrID := offerMap[planID.Relationships.ServiceOffering.Data.GUID]
 		spaceID := instance.Relationships.Space.Data.GUID
 
-		org := spacesToOrgs[spaceID]
-		orgID := org.ID.String()
-		customerID := org.CustomerID
+		smi := spaceMap[spaceID]
+		spaceName := smi.space.Name
+		customerID := smi.dbOrg.CustomerID
+
+		var orgID, orgName string
+
+		if smi.org != nil {
+			orgID = smi.org.GUID
+			orgName = smi.org.Name
+		} else {
+			orgID = smi.dbOrg.ID.String()
+			orgName = smi.dbOrg.Name.String
+		}
 
 		cfOrgNode, err := node.New(
 			customerID,
 			orgID,
-			node.WithSlugAuto("cforg", org.Name.String),
+			node.WithSlugAuto("cforg", orgName),
 			node.WithPathAuto("apps.usage"),
 		)
 		if err != nil {
@@ -121,7 +144,7 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 		spaceNode, err := node.New(
 			customerID,
 			spaceID,
-			node.WithSlugAuto("space", spaceMap[spaceID].Name),
+			node.WithSlugAuto("space", spaceName),
 			node.WithPathByParent(cfOrgNode),
 		)
 		if err != nil {
@@ -140,10 +163,11 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 
 		nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, svcNode}...)
 
-		usage[i] = reader.Measurement{
+		usage[i] = &reader.Measurement{
 			Meter:                 m.Name(),
 			CustomerID:            customerID,
 			OrgID:                 orgID,
+			OrgName:               orgName,
 			ResourceKindNaturalID: instance.Relationships.ServicePlan.Data.GUID,
 			ResourceNaturalID:     instance.GUID,
 			Value:                 1, // For this type of service, 1 indicates it is present at time of reading

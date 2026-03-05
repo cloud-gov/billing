@@ -19,7 +19,7 @@ type Querier interface {
 	// BoundsMonthPrev calculates bounds that encapsulate the month previous to the parameter, as_of. The first bound is inclusive and the second is exclusive.
 	BoundsMonthPrev(ctx context.Context, asOf pgtype.Timestamptz) (BoundsMonthPrevRow, error)
 	// BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
-	BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error
+	BulkCreateCFOrgs(ctx context.Context, arg BulkCreateCFOrgsParams) error
 	BulkCreateMeasurement(ctx context.Context, arg BulkCreateMeasurementParams) error
 	// BulkCreateMeters creates Meter rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
 	BulkCreateMeters(ctx context.Context, names []string) error
