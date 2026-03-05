@@ -12,15 +12,27 @@ import (
 )
 
 const bulkCreateCFOrgs = `-- name: BulkCreateCFOrgs :exec
-INSERT INTO cf_org (id)
-SELECT DISTINCT id
-FROM UNNEST($1::uuid[]) AS id
-ON CONFLICT DO NOTHING
+INSERT INTO cf_org (id, name)
+SELECT
+  id,
+  name
+FROM
+  UNNEST(
+    $1::uuid[],
+    $2::text[]
+  ) AS o (id, name)
+ON CONFLICT (id) DO UPDATE
+  SET name = excluded.name
 `
 
+type BulkCreateCFOrgsParams struct {
+	Ids   []pgtype.UUID
+	Names []string
+}
+
 // BulkCreateCFOrgs creates CFOrg rows in bulk with the minimum required columns. If a row with the given primary key already exists, that input item is ignored.
-func (q *Queries) BulkCreateCFOrgs(ctx context.Context, ids []pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, bulkCreateCFOrgs, ids)
+func (q *Queries) BulkCreateCFOrgs(ctx context.Context, arg BulkCreateCFOrgsParams) error {
+	_, err := q.db.Exec(ctx, bulkCreateCFOrgs, arg.Ids, arg.Names)
 	return err
 }
 
@@ -55,7 +67,7 @@ func (q *Queries) DeleteCFOrg(ctx context.Context, id pgtype.UUID) error {
 
 const getCFOrg = `-- name: GetCFOrg :one
 SELECT id, name, customer_id FROM cf_org
-WHERE id = $1 LIMIT 1
+WHERE id = $1
 `
 
 func (q *Queries) GetCFOrg(ctx context.Context, id pgtype.UUID) (CFOrg, error) {
@@ -92,7 +104,7 @@ func (q *Queries) ListCFOrgs(ctx context.Context) ([]CFOrg, error) {
 
 const updateCFOrg = `-- name: UpdateCFOrg :exec
 UPDATE cf_org
-  set name = $2
+SET name = $2
 WHERE id = $1
 `
 

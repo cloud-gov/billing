@@ -19,14 +19,14 @@ type ServiceMeterCfProvider interface {
 }
 
 type Apps interface {
-	AppsListWithSpaces(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, error)
+	AppsListWithSpacesAndOrgs(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, []*resource.Organization, error)
 }
 type Processes interface {
 	ProcessesList(context.Context, *client.ProcessListOptions) ([]*resource.Process, error)
 }
 
 type Spaces interface {
-	SpacesList(context.Context, *client.SpaceListOptions) ([]*resource.Space, error)
+	SpacesListWithOrgs(context.Context, *client.SpaceListOptions) ([]*resource.Space, []*resource.Organization, error)
 }
 type ServiceInstances interface {
 	ServiceInstancesList(context.Context, *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error)
@@ -43,12 +43,20 @@ func (c *CFAdapter) AppsListWithSpaces(ctx context.Context, opts *client.AppList
 	return c.Applications.ListIncludeSpacesAll(ctx, opts)
 }
 
+func (c *CFAdapter) AppsListWithSpacesAndOrgs(ctx context.Context, opts *client.AppListOptions) ([]*resource.App, []*resource.Space, []*resource.Organization, error) {
+	return c.Applications.ListIncludeSpacesAndOrganizationsAll(ctx, opts)
+}
+
 func (c *CFAdapter) ProcessesList(ctx context.Context, opts *client.ProcessListOptions) ([]*resource.Process, error) {
 	return c.Processes.ListAll(ctx, opts)
 }
 
 func (c *CFAdapter) SpacesList(ctx context.Context, opts *client.SpaceListOptions) ([]*resource.Space, error) {
 	return c.Spaces.ListAll(ctx, opts)
+}
+
+func (c *CFAdapter) SpacesListWithOrgs(ctx context.Context, opts *client.SpaceListOptions) ([]*resource.Space, []*resource.Organization, error) {
+	return c.Spaces.ListIncludeOrganizationsAll(ctx, opts)
 }
 
 func (c *CFAdapter) ServiceInstancesList(ctx context.Context, opts *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {

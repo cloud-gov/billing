@@ -21,6 +21,7 @@ type Reading struct {
 type Measurement struct {
 	CustomerID pgtype.UUID
 	OrgID      string
+	OrgName    string
 	// Meter is the name of the meter which produced this [Measurement].
 	Meter string
 	// ResourceKindNaturalID is the "natural" ID of the Kind of billable resource being measured. The ID is maintained by the external system. For example, the plan ID of a Cloud Foundry service instance. Not all ResourceKinds have a natural ID, so this field may be empty.
