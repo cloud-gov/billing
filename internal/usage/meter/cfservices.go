@@ -43,7 +43,7 @@ func (m *CFServiceMeter) Name() string {
 
 // ReadUsage returns the point-in-time usage of services in Cloud Foundry.
 // Returns a non-nil error if there was an error during the overall process of reading usage information from the target system. If individual readings had errors, their errs fields should be set.
-func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, []*node.Node, error) {
+func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "service meter: listing services")
 	opts := client.NewServiceInstanceListOptions()
 	// Ignore user-provided services, which we do not bill for. IMPORTANT: If this is not set, user-provided services will be included. Some response fields that we assume are non-nil, like .Relationships, will be nil on user-provided services. The code below does not guard against this and will panic.
@@ -78,18 +78,27 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 	type spaceMapItem struct {
 		space *resource.Space
 		org   *resource.Organization
-		dbOrg *db.CFOrg
+		dbOrg db.CFOrg
 	}
 	spaceMap := make(map[string]spaceMapItem, len(spaces))
 	for i, s := range spaces {
 		smi := spaceMapItem{}
-		spaceMap[s.GUID] = smi
-
 		smi.space = s
-		smi.org = orgs[i]
-
+		spaceMap[s.GUID] = smi
 		relOrgID := s.Relationships.Organization.Data.GUID
 
+		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.ToUUID(relOrgID))
+		if err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, nil, err
+			}
+		}
+		smi.dbOrg = dbOrg
+
+		if len(orgs) <= i {
+			continue
+		}
+		smi.org = orgs[i]
 		if smi.org.GUID != relOrgID {
 			m.logger.Error("error: org indices do not match space indices!!",
 				"idx", i,
@@ -97,18 +106,9 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 				"smiOrgID", smi.org.GUID)
 			smi.org = nil
 		}
-
-		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.UtilUUID(relOrgID))
-		if err != nil {
-			if !errors.Is(err, pgx.ErrNoRows) {
-				return nil, nil, err
-			}
-		}
-
-		smi.dbOrg = &dbOrg
 	}
 
-	usage := make([]reader.Measurement, len(si))
+	usage := make([]*reader.Measurement, len(si))
 	nodes := make([]*node.Node, 0, len(si)*3)
 
 	m.logger.DebugContext(ctx, "service meter: aggregating services")
@@ -118,10 +118,18 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 		spaceID := instance.Relationships.Space.Data.GUID
 
 		smi := spaceMap[spaceID]
-		orgID := smi.org.GUID
-		orgName := smi.org.Name
 		spaceName := smi.space.Name
 		customerID := smi.dbOrg.CustomerID
+
+		var orgID, orgName string
+
+		if smi.org != nil {
+			orgID = smi.org.GUID
+			orgName = smi.org.Name
+		} else {
+			orgID = smi.dbOrg.ID.String()
+			orgName = smi.dbOrg.Name.String
+		}
 
 		cfOrgNode, err := node.New(
 			customerID,
@@ -155,7 +163,7 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]reader.Measurement, [
 
 		nodes = append(nodes, []*node.Node{cfOrgNode, spaceNode, svcNode}...)
 
-		usage[i] = reader.Measurement{
+		usage[i] = &reader.Measurement{
 			Meter:                 m.Name(),
 			CustomerID:            customerID,
 			OrgID:                 orgID,

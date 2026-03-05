@@ -13,7 +13,7 @@ import (
 // Reading is a point in time at which measurements of billable resources were taken.
 type Reading struct {
 	Time         time.Time
-	Measurements []Measurement
+	Measurements []*Measurement
 	Nodes        []*node.Node
 }
 
@@ -35,7 +35,7 @@ type Measurement struct {
 
 // Meter defines a type that can read usage information from a system containing billable resources, akin to a utility meter.
 type Meter interface {
-	ReadUsage(context.Context) ([]Measurement, []*node.Node, error)
+	ReadUsage(context.Context) ([]*Measurement, []*node.Node, error)
 	Name() string
 }
 
@@ -55,7 +55,7 @@ func (rdr *Reader) Read(ctx context.Context) (Reading, error) {
 	reading := Reading{
 		Time:         time.Now().UTC(),
 		Nodes:        make([]*node.Node, 0),
-		Measurements: make([]Measurement, 0),
+		Measurements: make([]*Measurement, 0),
 	}
 	var reterr error
 

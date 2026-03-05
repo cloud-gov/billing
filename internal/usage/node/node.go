@@ -72,17 +72,11 @@ func WithPathByParent(parent *Node) NodeOpt {
 	return WithPathAuto(parent.Path)
 }
 
-func New(customerID any, resourceID string, opts ...NodeOpt) (*Node, error) {
-	n := &Node{ResourceNaturalID: resourceID}
-
-	n.CustomerID = dbx.UtilUUID(customerID)
-	if !n.CustomerID.Valid {
-		err := n.CustomerID.Scan("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")
-		if err != nil {
-			panic(err)
-		}
+func New[A, B string | pgtype.UUID](customerID A, resourceID B, opts ...NodeOpt) (*Node, error) {
+	n := &Node{
+		CustomerID:        dbx.ToBlankableUUID(customerID),
+		ResourceNaturalID: dbx.UUIDishString(resourceID),
 	}
-
 	for _, o := range opts {
 		if err := o(n); err != nil {
 			return nil, fmt.Errorf("new node: opts: %w", err)

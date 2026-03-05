@@ -253,7 +253,7 @@ func buildQuery() string {
 func getCustomerID(ctx context.Context, q dbx.Querier) (id pgtype.UUID, err error) {
 	r := getRawCID()
 	if r != "" {
-		return dbx.UtilUUID(r), nil
+		return dbx.ToUUID(r), nil
 	}
 
 	cs, e := q.GetCustomersByName(ctx, cname)

@@ -96,7 +96,7 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*n
 		if sidx < 0 {
 			msrmt.Errs = errors.Join(msrmt.Errs, ErrSpaceNotFound)
 			appNode, err := node.New(
-				nil,
+				"",
 				app.GUID,
 				node.WithSlugAuto("app", app.Name),
 				node.WithPathAuto("orphan"),
@@ -109,25 +109,31 @@ func (m *CFAppMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*n
 			return measurements, nodes, nil
 		}
 
+		var org *resource.Organization
+		var orgName string
+		orgID := spaces[sidx].Relationships.Organization.Data.GUID
 		orgIdx := slices.IndexFunc(orgs, func(o *resource.Organization) bool {
-			return o.GUID == spaces[sidx].Relationships.Organization.Data.GUID
+			return o.GUID == orgID
 		})
-		org := orgs[orgIdx]
+		if orgIdx >= 0 && len(orgs) > orgIdx {
+			org = orgs[orgIdx]
+			orgName = org.Name
+		}
 
-		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.UtilUUID(org.GUID))
+		dbOrg, err := m.dbq.GetCFOrg(ctx, dbx.ToUUID(orgID))
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil, fmt.Errorf("ReadUsage: getting org: %w", err)
 		}
 		customerID := dbOrg.CustomerID
 
 		msrmt.CustomerID = customerID
-		msrmt.OrgID = org.GUID
-		msrmt.OrgName = org.Name
+		msrmt.OrgID = orgID
+		msrmt.OrgName = orgName
 
 		cfOrgNode, err := node.New(
 			customerID,
-			org.GUID,
-			node.WithSlugAuto("cforg", org.Name),
+			orgID,
+			node.WithSlugAuto("cforg", orgName),
 			node.WithPathAuto("apps.usage"),
 		)
 		if err != nil {

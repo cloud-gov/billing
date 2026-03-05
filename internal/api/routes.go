@@ -104,7 +104,7 @@ func handleCreateAppUsageJob(logger *slog.Logger, cf *client.Client, q db.Querie
 			NaturalID:     app.GUID,
 			Meter:         "oneoff",
 			KindNaturalID: "",
-			CFOrgID:       dbx.UtilUUID(space.Relationships.Organization.Data.GUID),
+			CFOrgID:       dbx.ToUUID(space.Relationships.Organization.Data.GUID),
 		})
 		if err != nil {
 			http.Error(w, "upserting resource: "+err.Error(), http.StatusInternalServerError)

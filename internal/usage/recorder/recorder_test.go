@@ -23,7 +23,7 @@ type stubQuerier struct {
 
 	createReadingTS pgtype.Timestamp
 	bulkMeters      []string
-	bulkOrgs        []pgtype.UUID
+	bulkOrgs        db.BulkCreateCFOrgsParams
 	bulkKinds       db.BulkCreateResourceKindsParams
 	bulkResources   db.BulkCreateResourcesParams
 	bulkMs          db.BulkCreateMeasurementParams
@@ -60,7 +60,7 @@ func (s *stubQuerier) BulkCreateMeters(_ context.Context, meters []string) error
 	return nil
 }
 
-func (s *stubQuerier) BulkCreateCFOrgs(_ context.Context, orgs []pgtype.UUID) error {
+func (s *stubQuerier) BulkCreateCFOrgs(_ context.Context, orgs db.BulkCreateCFOrgsParams) error {
 	if s.errOn == "BulkCreateCFOrgs" {
 		return ErrExpected
 	}
@@ -192,11 +192,11 @@ func (s *stubQuerier) LQueryResourceNodes(ctx context.Context, arg db.LQueryReso
 	panic("unimplemented")
 }
 
-func (q *stubQuerier) ListResourceNodeAncestors(ctx context.Context, path string) ([]db.ResourceNode, error) {
+func (s *stubQuerier) ListResourceNodeAncestors(ctx context.Context, path string) ([]db.ResourceNode, error) {
 	panic("unimplemented")
 }
 
-func (q *stubQuerier) ListResourceNodeDescendants(ctx context.Context, path string) ([]db.ResourceNode, error) {
+func (s *stubQuerier) ListResourceNodeDescendants(ctx context.Context, path string) ([]db.ResourceNode, error) {
 	panic("unimplemented")
 }
 
@@ -313,14 +313,14 @@ const (
 )
 
 func TestRecordReading(t *testing.T) {
-	goodM := reader.Measurement{
+	goodM := &reader.Measurement{
 		Meter:                 "cpu",
 		OrgID:                 uuid.NewString(),
 		ResourceNaturalID:     "inst-1",
 		ResourceKindNaturalID: "kind-1",
 		Value:                 10,
 	}
-	emptyM := reader.Measurement{}
+	emptyM := &reader.Measurement{}
 
 	cases := []struct {
 		name       string
@@ -340,7 +340,7 @@ func TestRecordReading(t *testing.T) {
 			"only empties",
 			reader.Reading{
 				Time:         time.Now(),
-				Measurements: []reader.Measurement{emptyM},
+				Measurements: []*reader.Measurement{emptyM},
 			},
 			"",
 			NotWanted,
@@ -350,7 +350,7 @@ func TestRecordReading(t *testing.T) {
 			"mixed good+empty",
 			reader.Reading{
 				Time:         time.Now(),
-				Measurements: []reader.Measurement{goodM, emptyM},
+				Measurements: []*reader.Measurement{goodM, emptyM},
 			},
 			"",
 			NotWanted,
@@ -360,7 +360,7 @@ func TestRecordReading(t *testing.T) {
 			"duplicates",
 			reader.Reading{
 				Time:         time.Now(),
-				Measurements: []reader.Measurement{goodM, goodM},
+				Measurements: []*reader.Measurement{goodM, goodM},
 			},
 			"",
 			NotWanted,
@@ -370,7 +370,7 @@ func TestRecordReading(t *testing.T) {
 			"negative value",
 			reader.Reading{
 				Time: time.Now(),
-				Measurements: []reader.Measurement{
+				Measurements: []*reader.Measurement{
 					{
 						Meter:                 "disk",
 						OrgID:                 uuid.NewString(),
@@ -388,7 +388,7 @@ func TestRecordReading(t *testing.T) {
 			"int32 overflow", // we just check that we *didn’t* crash
 			reader.Reading{
 				Time: time.Now(),
-				Measurements: []reader.Measurement{
+				Measurements: []*reader.Measurement{
 					{
 						Meter:                 "ram",
 						OrgID:                 uuid.NewString(),
@@ -406,7 +406,7 @@ func TestRecordReading(t *testing.T) {
 			"bad UUID", // stub makes failure surface at org insert
 			reader.Reading{
 				Time: time.Now(),
-				Measurements: []reader.Measurement{
+				Measurements: []*reader.Measurement{
 					{
 						Meter:                 "net",
 						OrgID:                 "not-a-uuid",
@@ -424,7 +424,7 @@ func TestRecordReading(t *testing.T) {
 			"zero time",
 			reader.Reading{
 				Time:         time.Time{},
-				Measurements: []reader.Measurement{goodM},
+				Measurements: []*reader.Measurement{goodM},
 			},
 			"",
 			NotWanted,
@@ -434,7 +434,7 @@ func TestRecordReading(t *testing.T) {
 			"error on BulkCreateResources",
 			reader.Reading{
 				Time:         time.Now(),
-				Measurements: []reader.Measurement{goodM},
+				Measurements: []*reader.Measurement{goodM},
 			},
 			"BulkCreateResources",
 			ErrWanted,

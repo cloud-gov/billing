@@ -34,6 +34,7 @@ type MockAppMeterCfProvider struct {
 	Apps      []*resource.App
 	Spaces    []*resource.Space
 	Processes []*resource.Process
+	Orgs      []*resource.Organization
 	AppErr    error
 	ProcErr   error
 }
@@ -44,6 +45,7 @@ type MockServiceMeterCfProvider struct {
 	Instances []*resource.ServiceInstance
 	Plans     []*resource.ServicePlan
 	Offerings []*resource.ServiceOffering
+	Orgs      []*resource.Organization
 }
 
 func NewMockAppMeterCfProvider() *MockAppMeterCfProvider {
@@ -58,12 +60,20 @@ func (p *MockAppMeterCfProvider) AppsListWithSpaces(_ context.Context, _ *client
 	return p.Apps, p.Spaces, p.AppErr
 }
 
+func (p *MockAppMeterCfProvider) AppsListWithSpacesAndOrgs(_ context.Context, _ *client.AppListOptions) ([]*resource.App, []*resource.Space, []*resource.Organization, error) {
+	return p.Apps, p.Spaces, p.Orgs, p.AppErr
+}
+
 func (p *MockAppMeterCfProvider) ProcessesList(_ context.Context, _ *client.ProcessListOptions) ([]*resource.Process, error) {
 	return p.Processes, p.ProcErr
 }
 
 func (p *MockServiceMeterCfProvider) SpacesList(_ context.Context, _ *client.SpaceListOptions) ([]*resource.Space, error) {
 	return p.Spaces, nil
+}
+
+func (p *MockServiceMeterCfProvider) SpacesListWithOrgs(_ context.Context, _ *client.SpaceListOptions) ([]*resource.Space, []*resource.Organization, error) {
+	return p.Spaces, p.Orgs, nil
 }
 
 func (p *MockServiceMeterCfProvider) ServiceInstancesList(_ context.Context, _ *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
