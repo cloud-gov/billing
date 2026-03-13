@@ -46,6 +46,7 @@ func (m *CFServiceMeter) Name() string {
 func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*node.Node, error) {
 	m.logger.DebugContext(ctx, "service meter: listing services")
 	opts := client.NewServiceInstanceListOptions()
+
 	// Ignore user-provided services, which we do not bill for. IMPORTANT: If this is not set, user-provided services will be included. Some response fields that we assume are non-nil, like .Relationships, will be nil on user-provided services. The code below does not guard against this and will panic.
 	opts.Type = "managed"
 	si, err := m.client.ServiceInstancesList(ctx, opts)
@@ -100,7 +101,7 @@ func (m *CFServiceMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, 
 		}
 		smi.org = orgs[i]
 		if smi.org.GUID != relOrgID {
-			m.logger.Error("error: org indices do not match space indices!!",
+			m.logger.ErrorContext(ctx, "org indices do not match space indices!!",
 				"idx", i,
 				"relOrgID", relOrgID,
 				"smiOrgID", smi.org.GUID)
