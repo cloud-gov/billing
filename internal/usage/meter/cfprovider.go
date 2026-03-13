@@ -18,6 +18,11 @@ type ServiceMeterCfProvider interface {
 	ServicePlans
 }
 
+type AWSMeterCfProvider interface {
+	Apps
+	Processes
+}
+
 type Apps interface {
 	AppsListWithSpacesAndOrgs(context.Context, *client.AppListOptions) ([]*resource.App, []*resource.Space, []*resource.Organization, error)
 }

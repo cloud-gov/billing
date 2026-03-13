@@ -91,9 +91,11 @@ func run(ctx context.Context, out io.Writer) error {
 
 	logger.Debug("run: initializing meters")
 	mClient := &meter.CFAdapter{Client: cfclient}
+
 	meters := []reader.Meter{
-		meter.NewCFServiceMeter(logger, mClient, q),
-		meter.NewCFAppMeter(logger, mClient, q),
+		// meter.NewCFServiceMeter(logger, mClient, q),
+		// meter.NewCFAppMeter(logger, mClient, q),
+		meter.NewAWSMeter(logger, mClient, q),
 	}
 	rdr := reader.New(meters)
 
