@@ -35,7 +35,7 @@ resource "cloudfoundry_app" "billing" {
     {
       "GO_LINKER_SYMBOL" = "main.BuildVersion"
       "GO_LINKER_VALUE"  = var.short_ref
-      "GOVERSION"        = "1.24"
+      "GOVERSION"        = "1.26"
     },
     var.environment
   )
