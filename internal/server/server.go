@@ -36,9 +36,7 @@ func (s *Server) ListenAndServe(ctx context.Context) {
 		}
 	}()
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		<-ctx.Done()
 		shutdownCtx := context.Background()
 		shutdownCtx, cancel := context.WithTimeout(shutdownCtx, 10*time.Second)
@@ -46,7 +44,7 @@ func (s *Server) ListenAndServe(ctx context.Context) {
 		if err := s.srv.Shutdown(shutdownCtx); err != nil {
 			s.logger.Error("Error while shutting down server", "err", err)
 		}
-	}()
+	})
 	// Wait for the shutdown goroutine to terminate before returning.
 	wg.Wait()
 }
