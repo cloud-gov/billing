@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -207,6 +208,11 @@ func run(ctx context.Context, out io.Writer) error {
 		logger.Debug("weirds gotten in report", "node", n)
 	}
 	logger.Debug("run: got report", "report", report)
+
+	enc := json.NewEncoder(out)
+	if err := enc.Encode(report); err != nil {
+		return fmt.Errorf("error encoding report into JSON: %w", err)
+	}
 
 	return err
 }
