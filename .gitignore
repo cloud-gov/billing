@@ -226,3 +226,7 @@ $tf/
 # Custom
 *.zip
 jwt.txt
+
+# CLI
+cmd/usage/usage
+cmd/usage/*.json
