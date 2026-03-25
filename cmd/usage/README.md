@@ -43,5 +43,5 @@ To produce a JSON report of usage:
 1. Run the usage CLI and stream output to a JSON file:
 
     ```shell
-    ./usage | jq | tee report.json
+    ./usage -cname 'some customer' | jq | tee report.json
     ```
