@@ -20,14 +20,17 @@ To produce a JSON report of usage:
 1. Create a `.env` with the database connection information and other necessary variables
 
     ```env
-    export CF_API_URL=
-    export CF_CLIENT_ID=
-    export CF_CLIENT_SECRET=
+    # fill with your tunnel's connection parameters
     export PGHOST=localhost
     export PGPORT=
     export PGDATABASE=
     export PGUSER=
     export PGPASSWORD=
+    
+    # blank values are fine
+    export CF_API_URL=
+    export CF_CLIENT_ID=
+    export CF_CLIENT_SECRET=
     export OIDC_ISSUER=
     ```
 
