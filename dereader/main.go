@@ -5,12 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	tm "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+
 	"github.com/aws/aws-sdk-go-v2/service/bcmdataexports"
-	"github.com/aws/aws-sdk-go-v2/service/bcmdataexports/types"
+	btypes "github.com/aws/aws-sdk-go-v2/service/bcmdataexports/types"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	stypes "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 var (
@@ -20,7 +28,7 @@ var (
 	ErrAWSConfig = errors.New("configuring AWS")
 )
 
-const exportARN string = "arn:aws:bcm-data-exports:us-east-1:223822404828:export/cg-billing-export-cur-hourly-csv-4d785f67-dee8-414d-b592-46c0a2c832dd"
+const exportARN string = "arn:aws:bcm-data-exports:us-east-1:223822404828:export/cg-billing-focus12-hourly-csv-4ecb05a5-f3c8-46ad-a097-1910cd50673a"
 
 func check(e ...any) {
 	if e[0] == nil {
@@ -31,34 +39,76 @@ func check(e ...any) {
 	panic(fmt.Errorf(format, e...))
 }
 
-func findMostRecentSuccessfulExecution(
-	ctx context.Context,
-	dec *bcmdataexports.Client,
-	exp *types.Export,
-	token *string,
-) (*bcmdataexports.GetExecutionOutput, error) {
-	execs, err := dec.ListExecutions(ctx, &bcmdataexports.ListExecutionsInput{
-		ExportArn: exp.ExportArn,
-		NextToken: token,
+type gatherer struct {
+	ctx context.Context
+
+	exp     *btypes.Export
+	expArn  *string
+	dest    *btypes.S3Destination
+	grain   string
+	query   *string
+	updated *time.Time
+
+	period time.Time
+	prefix string
+
+	be *bcmdataexports.Client
+	s3 *s3.Client
+	tm *tm.Client
+}
+
+func (g *gatherer) FilterObject(o stypes.Object) bool {
+	post := strings.ReplaceAll(*o.Key, g.prefix, "")
+	path := strings.Contains(post, "/")
+	return !path
+}
+
+func (g *gatherer) setPrefix() {
+	g.prefix = fmt.Sprintf("%v/data/billing_period=%v/", *g.exp.Name, g.period.Format("2006-01"))
+	if g.dest.S3Prefix != nil {
+		g.prefix = fmt.Sprintf("%v/%v", *g.dest.S3Prefix, g.prefix)
+	}
+}
+
+func (g *gatherer) getExport() (*bcmdataexports.GetExportOutput, error) {
+	o, e := g.be.GetExport(g.ctx, &bcmdataexports.GetExportInput{ExportArn: g.expArn})
+	if e != nil {
+		return nil, e
+	}
+
+	g.exp = o.Export
+	g.dest = o.Export.DestinationConfigurations.S3Destination
+	g.query = o.Export.DataQuery.QueryStatement
+	g.updated = o.ExportStatus.LastRefreshedAt
+	g.grain = slices.Collect(maps.Values(
+		o.Export.DataQuery.TableConfigurations))[0]["TIME_GRANULARITY"]
+
+	g.setPrefix()
+
+	return o, nil
+}
+
+func (g *gatherer) getFiles(path string) (*tm.DownloadDirectoryOutput, error) {
+	return g.tm.DownloadDirectory(g.ctx, &tm.DownloadDirectoryInput{
+		Bucket:      g.dest.S3Bucket,
+		KeyPrefix:   &g.prefix,
+		Destination: &path,
+		Filter:      g,
 	})
-	check(err, errors.New("listing export executions"))
+}
 
-	for _, e := range execs.Executions {
-		if e.ExecutionStatus.StatusCode == types.ExecutionStatusCodeDeliverySuccess {
-			exec, err := dec.GetExecution(ctx, &bcmdataexports.GetExecutionInput{
-				ExportArn:   exp.ExportArn,
-				ExecutionId: e.ExecutionId,
-			})
-			check(err, errors.New("getting full execution"))
-			return exec, nil
-		}
+func newGatherer(ctx context.Context, cfg aws.Config, period time.Time) *gatherer {
+	s3c := s3.NewFromConfig(cfg)
+	g := gatherer{
+		s3: s3c,
+		tm: tm.New(s3c),
+		be: bcmdataexports.NewFromConfig(cfg),
+
+		ctx:    ctx,
+		period: period,
+		expArn: new(exportARN),
 	}
-
-	if execs.NextToken == nil {
-		return nil, errors.New("no successful execution")
-	}
-
-	return findMostRecentSuccessfulExecution(ctx, dec, exp, execs.NextToken)
+	return &g
 }
 
 func main() {
@@ -70,23 +120,20 @@ func main() {
 
 	ctx := context.Background()
 
-	// ReadCSV()
-
 	cfg, err := config.LoadDefaultConfig(ctx)
 	check(err, ErrAWSConfig)
 
-	dec := bcmdataexports.NewFromConfig(cfg)
+	// TODO: get date of last aws sync, trunc month, use as this date prefix
+	// could also potentially use checksum to detect change
+	period := time.Now()
 
-	exp, err := dec.GetExport(ctx, &bcmdataexports.GetExportInput{ExportArn: new(exportARN)})
+	gat := newGatherer(ctx, cfg, period)
+
+	_, err = gat.getExport()
 	check(err, errors.New("getting export"))
 
-	execs, err := dec.ListExecutions(ctx, &bcmdataexports.ListExecutionsInput{ExportArn: exp.Export.ExportArn})
-	check(err, errors.New("getting export executions"))
+	out, err := gat.getFiles(".tmp")
+	check(err, errors.New("downloading directory"))
 
-	for _, e := range execs.Executions {
-		if e.ExecutionStatus.StatusCode == types.ExecutionStatusCodeDeliverySuccess {
-			// exec, err := dec.GetExecution(ctx, &bcmdataexports.GetExecutionInput{ExecutionId: e.ExecutionId})
-			// Find reading, compare?
-		}
-	}
+	fmt.Println(out)
 }
