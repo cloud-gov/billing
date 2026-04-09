@@ -39,6 +39,11 @@ func check(e ...any) {
 	panic(fmt.Errorf(format, e...))
 }
 
+func gCheck(e ...any) {
+	e = append(e, "gatherer")
+	check(e...)
+}
+
 type gatherer struct {
 	ctx context.Context
 
@@ -72,9 +77,7 @@ func (g *gatherer) setPrefix() {
 
 func (g *gatherer) getExport() (*bcmdataexports.GetExportOutput, error) {
 	o, e := g.be.GetExport(g.ctx, &bcmdataexports.GetExportInput{ExportArn: g.expArn})
-	if e != nil {
-		return nil, e
-	}
+	gCheck(e)
 
 	g.exp = o.Export
 	g.dest = o.Export.DestinationConfigurations.S3Destination
@@ -89,12 +92,14 @@ func (g *gatherer) getExport() (*bcmdataexports.GetExportOutput, error) {
 }
 
 func (g *gatherer) getFiles(path string) (*tm.DownloadDirectoryOutput, error) {
-	return g.tm.DownloadDirectory(g.ctx, &tm.DownloadDirectoryInput{
+	o, e := g.tm.DownloadDirectory(g.ctx, &tm.DownloadDirectoryInput{
 		Bucket:      g.dest.S3Bucket,
 		KeyPrefix:   &g.prefix,
 		Destination: &path,
 		Filter:      g,
 	})
+	gCheck(e)
+	return o, e
 }
 
 func newGatherer(ctx context.Context, cfg aws.Config, period time.Time) *gatherer {
