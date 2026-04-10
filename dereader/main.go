@@ -9,8 +9,10 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocarina/gocsv"
@@ -140,20 +142,24 @@ func (b *BeeKeeper) getFiles() (*tm.DownloadDirectoryOutput, error) {
 	return o, e
 }
 
-func (b *BeeKeeper) readLinesChan(lc chan *FocusSpec) {
-	for ln := range lc {
-		fmt.Println(ln.ConsumedQuantity.Decimal.String(), ln.ConsumedUnit)
+var lines = make([]int, 5)
+
+func (b *BeeKeeper) readLinesChan(lc <-chan *FocusSpec, cnt *int) {
+	for range lc {
+		*cnt++
+		// fmt.Println(ln.ConsumedQuantity.Decimal.String(), ln.ConsumedUnit)
 	}
 }
 
 func (b *BeeKeeper) readFiles() error {
-	lc := make(chan *FocusSpec)
+	wg := sync.WaitGroup{}
 	fsys := os.DirFS(b.localPath)
 	chkErr := b.check.withLabels("readFiles")
 
+	cnt := 0
+
 	err := fs.WalkDir(fsys, ".", func(path string, dir fs.DirEntry, err error) error {
 		chkErr(err, "walking dir, inner")
-
 		if path == "." {
 			return nil
 		}
@@ -164,23 +170,38 @@ func (b *BeeKeeper) readFiles() error {
 		zr, err := gzip.NewReader(file)
 		chkErr(err, fmt.Sprintf("could not unzip: '%s'", path))
 
-		go b.readLinesChan(lc)
+		// TODO: race condition, the channel reader sometimes runs out
+		// before the writer is done, I think. sync with a 'done' channel?
+		lc := make(chan *FocusSpec)
 
-		err = gocsv.UnmarshalToChan(zr, lc)
-		chkErr(err, "scanning")
+		fmt.Println("unmarsalling…")
+		wg.Go(func() {
+			err = gocsv.UnmarshalToChan(zr, lc)
+			chkErr(err, "unmarshalling to channel")
+		})
+		wg.Go(func() { b.readLinesChan(lc, &lines[cnt]) })
+		cnt++
 
 		return nil
 	})
 	chkErr(err, "walking dir, outer")
 
+	fmt.Println("waiting…")
+	wg.Wait()
+	fmt.Println("done!")
+
 	return nil
 }
 
 func main() {
+	fmt.Println(runtime.GOMAXPROCS(-1))
+	start := time.Now()
+
 	defer (func() {
 		if r := recover(); r != nil {
 			fmt.Printf("dereader: %v", r)
 		}
+		fmt.Println(time.Since(start))
 	})()
 
 	ctx := context.Background()
@@ -195,12 +216,20 @@ func main() {
 
 	bkeep := NewBeeKeeper(ctx, cfg, filePath, period)
 
-	_, err = bkeep.getExport()
-	check(err, errors.New("getting export"))
+	// _, err = bkeep.getExport()
+	// check(err, errors.New("getting export"))
 
-	out, err := bkeep.getFiles(".tmp")
-	check(err, errors.New("downloading directory"))
+	// _, err = bkeep.getFiles()
+	// check(err, errors.New("downloading directory"))
 
 	err = bkeep.readFiles()
 	check(err, errors.New("reading BEE results"))
+
+	// 2_858_778
+	// 2_863_224
+	var count int
+	for _, x := range lines {
+		count += x
+	}
+	fmt.Println(count)
 }
