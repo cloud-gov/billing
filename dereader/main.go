@@ -2,7 +2,6 @@
 package main
 
 import (
-	"bufio"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -13,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/gocarina/gocsv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -139,36 +140,38 @@ func (b *BeeKeeper) getFiles() (*tm.DownloadDirectoryOutput, error) {
 	return o, e
 }
 
-// func (b *BeeKeeper) unzipFiles() error {
-// }
+func (b *BeeKeeper) readLinesChan(lc chan *FocusSpec) {
+	for ln := range lc {
+		fmt.Println(ln.ConsumedQuantity.Decimal.String(), ln.ConsumedUnit)
+	}
+}
 
 func (b *BeeKeeper) readFiles() error {
+	lc := make(chan *FocusSpec)
 	fsys := os.DirFS(b.localPath)
 	chkErr := b.check.withLabels("readFiles")
 
 	err := fs.WalkDir(fsys, ".", func(path string, dir fs.DirEntry, err error) error {
-		chkErr(err, "readFiles: walking dir, inner")
+		chkErr(err, "walking dir, inner")
+
 		if path == "." {
 			return nil
 		}
 
 		file, err := fsys.Open(path)
-		chkErr(err, fmt.Sprintf("readFiles: could not open: '%s'", path))
+		chkErr(err, fmt.Sprintf("could not open: '%s'", path))
 
 		zr, err := gzip.NewReader(file)
-		chkErr(err, fmt.Sprintf("readFiles: could not unzip: '%s'", path))
+		chkErr(err, fmt.Sprintf("could not unzip: '%s'", path))
 
-		scanner := bufio.NewScanner(zr)
-		for scanner.Scan() {
-			txt := scanner.Text()
-			fmt.Println(txt)
-		}
-		err = scanner.Err()
-		chkErr(err, "readFiles: scanning")
+		go b.readLinesChan(lc)
+
+		err = gocsv.UnmarshalToChan(zr, lc)
+		chkErr(err, "scanning")
 
 		return nil
 	})
-	chkErr(err, "readFiles: walking dir, outer")
+	chkErr(err, "walking dir, outer")
 
 	return nil
 }
