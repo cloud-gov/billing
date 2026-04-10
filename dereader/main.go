@@ -40,11 +40,13 @@ func check(e ...any) {
 }
 
 func gCheck(e ...any) {
-	e = append(e, "gatherer")
+	e = append(e, "BeeKeeper")
 	check(e...)
 }
 
-type gatherer struct {
+// BeeKeeper is a tool for getting and consuming AWS
+// Billing & Cost Management (Bcm) Export Executions
+type BeeKeeper struct {
 	ctx context.Context
 
 	exp     *btypes.Export
@@ -62,49 +64,49 @@ type gatherer struct {
 	tm *tm.Client
 }
 
-func (g *gatherer) FilterObject(o stypes.Object) bool {
-	post := strings.ReplaceAll(*o.Key, g.prefix, "")
+func (b *BeeKeeper) FilterObject(o stypes.Object) bool {
+	post := strings.ReplaceAll(*o.Key, b.prefix, "")
 	path := strings.Contains(post, "/")
 	return !path
 }
 
-func (g *gatherer) setPrefix() {
-	g.prefix = fmt.Sprintf("%v/data/billing_period=%v/", *g.exp.Name, g.period.Format("2006-01"))
-	if g.dest.S3Prefix != nil {
-		g.prefix = fmt.Sprintf("%v/%v", *g.dest.S3Prefix, g.prefix)
+func (b *BeeKeeper) setPrefix() {
+	b.prefix = fmt.Sprintf("%v/data/billing_period=%v/", *b.exp.Name, b.period.Format("2006-01"))
+	if b.dest.S3Prefix != nil {
+		b.prefix = fmt.Sprintf("%v/%v", *b.dest.S3Prefix, b.prefix)
 	}
 }
 
-func (g *gatherer) getExport() (*bcmdataexports.GetExportOutput, error) {
-	o, e := g.be.GetExport(g.ctx, &bcmdataexports.GetExportInput{ExportArn: g.expArn})
+func (b *BeeKeeper) getExport() (*bcmdataexports.GetExportOutput, error) {
+	o, e := b.be.GetExport(b.ctx, &bcmdataexports.GetExportInput{ExportArn: b.expArn})
 	gCheck(e)
 
-	g.exp = o.Export
-	g.dest = o.Export.DestinationConfigurations.S3Destination
-	g.query = o.Export.DataQuery.QueryStatement
-	g.updated = o.ExportStatus.LastRefreshedAt
-	g.grain = slices.Collect(maps.Values(
+	b.exp = o.Export
+	b.dest = o.Export.DestinationConfigurations.S3Destination
+	b.query = o.Export.DataQuery.QueryStatement
+	b.updated = o.ExportStatus.LastRefreshedAt
+	b.grain = slices.Collect(maps.Values(
 		o.Export.DataQuery.TableConfigurations))[0]["TIME_GRANULARITY"]
 
-	g.setPrefix()
+	b.setPrefix()
 
 	return o, nil
 }
 
-func (g *gatherer) getFiles(path string) (*tm.DownloadDirectoryOutput, error) {
-	o, e := g.tm.DownloadDirectory(g.ctx, &tm.DownloadDirectoryInput{
-		Bucket:      g.dest.S3Bucket,
-		KeyPrefix:   &g.prefix,
+func (b *BeeKeeper) getFiles(path string) (*tm.DownloadDirectoryOutput, error) {
+	o, e := b.tm.DownloadDirectory(b.ctx, &tm.DownloadDirectoryInput{
+		Bucket:      b.dest.S3Bucket,
+		KeyPrefix:   &b.prefix,
 		Destination: &path,
-		Filter:      g,
+		Filter:      b,
 	})
 	gCheck(e)
 	return o, e
 }
 
-func newGatherer(ctx context.Context, cfg aws.Config, period time.Time) *gatherer {
+func NewBeeKeeper(ctx context.Context, cfg aws.Config, period time.Time) *BeeKeeper {
 	s3c := s3.NewFromConfig(cfg)
-	g := gatherer{
+	g := BeeKeeper{
 		s3: s3c,
 		tm: tm.New(s3c),
 		be: bcmdataexports.NewFromConfig(cfg),
@@ -132,12 +134,12 @@ func main() {
 	// could also potentially use checksum to detect change
 	period := time.Now()
 
-	gat := newGatherer(ctx, cfg, period)
+	bkeep := NewBeeKeeper(ctx, cfg, period)
 
-	_, err = gat.getExport()
+	_, err = bkeep.getExport()
 	check(err, errors.New("getting export"))
 
-	out, err := gat.getFiles(".tmp")
+	out, err := bkeep.getFiles(".tmp")
 	check(err, errors.New("downloading directory"))
 
 	fmt.Println(out)
