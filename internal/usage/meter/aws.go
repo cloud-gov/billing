@@ -105,13 +105,13 @@ func (m *AWSMeter) ReadUsage(ctx context.Context) ([]*reader.Measurement, []*nod
 		return nil, nil, fmt.Errorf("getting cost & usage: %w", err)
 	}
 
-	fmt.Printf("a: %#v\n", out.DimensionValueAttributes)
-	fmt.Printf("b: %#v\n", out.GroupDefinitions)
-	fmt.Printf("c: %#v\n", out.ResultMetadata)
-	fmt.Printf("d: %#v\n", out.NextPageToken)
-	fmt.Printf("e: %#v\n", out.ResultsByTime)
+	pageToken := out.NextPageToken
+	if pageToken != nil {
+		m.logger.DebugContext(ctx, "there's a paging token!!", "token", out.NextPageToken)
+	}
 
-	m.logger.DebugContext(ctx, "got cost data!", "out", out)
+	results := out.ResultsByTime
+	m.logger.DebugContext(ctx, "got results from AWS", "results", results)
 
 	findings := make([]AWSFinding, 5)
 
