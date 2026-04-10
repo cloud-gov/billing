@@ -69,8 +69,12 @@ func (u *MeasureUsageWorker) Work(ctx context.Context, job *river.Job[MeasureUsa
 
 	txquerier := u.querier.WithTx(tx)
 
+	// TODO: This is an expensive operation. It can be avoided if we try
+	// inserting a Reading into the database with q.CreateUniqueReading before
+	// calling Read(), but as written, the Reading is only returned when all
+	// its meters have read usage. If we upsert the Reading earlier, we can mark
+	// the job Complete early.
 	u.logger.DebugContext(ctx, "measure-usage job: reading usage information")
-	// TODO: This is an expensive operation. It can be avoided if we try inserting a Reading into the database with q.CreateUniqueReading before calling Read(), but as written, the Reading is only returned when all its meters have read usage. If we upsert the Reading earlier, we can mark the job Complete early.
 	reading, err := u.rdr.Read(ctx)
 	if err != nil {
 		return err
