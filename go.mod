@@ -15,6 +15,7 @@ require (
 	github.com/riverqueue/river v0.23.1
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/shopspring/decimal v1.4.0
 )
 
 require (
@@ -70,7 +71,6 @@ require (
 	github.com/riverqueue/river/rivershared v0.23.1 // indirect
 	github.com/riverqueue/river/rivertype v0.23.1 // indirect
 	github.com/riza-io/grpc-go v0.2.0 // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
