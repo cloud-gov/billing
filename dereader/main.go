@@ -2,10 +2,14 @@
 package main
 
 import (
+	"bufio"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -39,9 +43,19 @@ func check(e ...any) {
 	panic(fmt.Errorf(format, e...))
 }
 
-func gCheck(e ...any) {
-	e = append(e, "BeeKeeper")
-	check(e...)
+type checker func(e error, s ...string)
+
+func (c checker) withLabels(l ...string) checker {
+	return func(e error, s ...string) {
+		c(e, append(l, s...)...)
+	}
+}
+
+func getChecker(l ...string) checker {
+	return func(e error, s ...string) {
+		msg := strings.Join(append(l, s...), ": ")
+		check(e, errors.New(msg))
+	}
 }
 
 // BeeKeeper is a tool for getting and consuming AWS
@@ -59,9 +73,30 @@ type BeeKeeper struct {
 	period time.Time
 	prefix string
 
+	localPath string
+
 	be *bcmdataexports.Client
 	s3 *s3.Client
 	tm *tm.Client
+
+	check checker
+}
+
+func NewBeeKeeper(ctx context.Context, cfg aws.Config, path string, period time.Time) *BeeKeeper {
+	s3c := s3.NewFromConfig(cfg)
+	b := BeeKeeper{
+		s3: s3c,
+		tm: tm.New(s3c),
+		be: bcmdataexports.NewFromConfig(cfg),
+
+		ctx:       ctx,
+		period:    period,
+		localPath: path,
+
+		expArn: new(exportARN),
+		check:  getChecker("BeeKeeper"),
+	}
+	return &b
 }
 
 func (b *BeeKeeper) FilterObject(o stypes.Object) bool {
@@ -79,7 +114,7 @@ func (b *BeeKeeper) setPrefix() {
 
 func (b *BeeKeeper) getExport() (*bcmdataexports.GetExportOutput, error) {
 	o, e := b.be.GetExport(b.ctx, &bcmdataexports.GetExportInput{ExportArn: b.expArn})
-	gCheck(e)
+	b.check(e)
 
 	b.exp = o.Export
 	b.dest = o.Export.DestinationConfigurations.S3Destination
@@ -93,29 +128,49 @@ func (b *BeeKeeper) getExport() (*bcmdataexports.GetExportOutput, error) {
 	return o, nil
 }
 
-func (b *BeeKeeper) getFiles(path string) (*tm.DownloadDirectoryOutput, error) {
+func (b *BeeKeeper) getFiles() (*tm.DownloadDirectoryOutput, error) {
 	o, e := b.tm.DownloadDirectory(b.ctx, &tm.DownloadDirectoryInput{
 		Bucket:      b.dest.S3Bucket,
 		KeyPrefix:   &b.prefix,
-		Destination: &path,
+		Destination: &b.localPath,
 		Filter:      b,
 	})
-	gCheck(e)
+	b.check(e)
 	return o, e
 }
 
-func NewBeeKeeper(ctx context.Context, cfg aws.Config, period time.Time) *BeeKeeper {
-	s3c := s3.NewFromConfig(cfg)
-	g := BeeKeeper{
-		s3: s3c,
-		tm: tm.New(s3c),
-		be: bcmdataexports.NewFromConfig(cfg),
+// func (b *BeeKeeper) unzipFiles() error {
+// }
 
-		ctx:    ctx,
-		period: period,
-		expArn: new(exportARN),
-	}
-	return &g
+func (b *BeeKeeper) readFiles() error {
+	fsys := os.DirFS(b.localPath)
+	chkErr := b.check.withLabels("readFiles")
+
+	err := fs.WalkDir(fsys, ".", func(path string, dir fs.DirEntry, err error) error {
+		chkErr(err, "readFiles: walking dir, inner")
+		if path == "." {
+			return nil
+		}
+
+		file, err := fsys.Open(path)
+		chkErr(err, fmt.Sprintf("readFiles: could not open: '%s'", path))
+
+		zr, err := gzip.NewReader(file)
+		chkErr(err, fmt.Sprintf("readFiles: could not unzip: '%s'", path))
+
+		scanner := bufio.NewScanner(zr)
+		for scanner.Scan() {
+			txt := scanner.Text()
+			fmt.Println(txt)
+		}
+		err = scanner.Err()
+		chkErr(err, "readFiles: scanning")
+
+		return nil
+	})
+	chkErr(err, "readFiles: walking dir, outer")
+
+	return nil
 }
 
 func main() {
@@ -133,8 +188,9 @@ func main() {
 	// TODO: get date of last aws sync, trunc month, use as this date prefix
 	// could also potentially use checksum to detect change
 	period := time.Now()
+	filePath := ".tmp"
 
-	bkeep := NewBeeKeeper(ctx, cfg, period)
+	bkeep := NewBeeKeeper(ctx, cfg, filePath, period)
 
 	_, err = bkeep.getExport()
 	check(err, errors.New("getting export"))
@@ -142,5 +198,6 @@ func main() {
 	out, err := bkeep.getFiles(".tmp")
 	check(err, errors.New("downloading directory"))
 
-	fmt.Println(out)
+	err = bkeep.readFiles()
+	check(err, errors.New("reading BEE results"))
 }
