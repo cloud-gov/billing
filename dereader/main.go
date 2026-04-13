@@ -9,10 +9,10 @@ import (
 	"io/fs"
 	"maps"
 	"os"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocarina/gocsv"
@@ -142,21 +142,20 @@ func (b *BeeKeeper) getFiles() (*tm.DownloadDirectoryOutput, error) {
 	return o, e
 }
 
-var lines = make([]int, 5)
-
-func (b *BeeKeeper) readLinesChan(lc <-chan *FocusSpec, cnt *int) {
+func (b *BeeKeeper) readLinesChan(lc <-chan *FocusSpec, cnt *atomic.Uint32) error {
 	for range lc {
-		*cnt++
 		// fmt.Println(ln.ConsumedQuantity.Decimal.String(), ln.ConsumedUnit)
+		cnt.Add(1)
 	}
+	return nil
 }
 
 func (b *BeeKeeper) readFiles() error {
-	wg := sync.WaitGroup{}
 	fsys := os.DirFS(b.localPath)
 	chkErr := b.check.withLabels("readFiles")
 
-	cnt := 0
+	wg := sync.WaitGroup{}
+	cnt := atomic.Uint32{}
 
 	err := fs.WalkDir(fsys, ".", func(path string, dir fs.DirEntry, err error) error {
 		chkErr(err, "walking dir, inner")
@@ -170,33 +169,24 @@ func (b *BeeKeeper) readFiles() error {
 		zr, err := gzip.NewReader(file)
 		chkErr(err, fmt.Sprintf("could not unzip: '%s'", path))
 
-		// TODO: race condition, the channel reader sometimes runs out
-		// before the writer is done, I think. sync with a 'done' channel?
-		lc := make(chan *FocusSpec)
+		lc := make(chan *FocusSpec, 10)
 
-		fmt.Println("unmarsalling…")
-		wg.Go(func() {
-			err = gocsv.UnmarshalToChan(zr, lc)
-			chkErr(err, "unmarshalling to channel")
-		})
-		wg.Go(func() { b.readLinesChan(lc, &lines[cnt]) })
-		cnt++
+		wg.Go(func() { chkErr(gocsv.UnmarshalToChan(zr, lc), "unmarshalling to channel") })
+		wg.Go(func() { chkErr(b.readLinesChan(lc, &cnt), "reading lines") })
 
 		return nil
 	})
 	chkErr(err, "walking dir, outer")
 
-	fmt.Println("waiting…")
+	fmt.Println("processing files…")
 	wg.Wait()
-	fmt.Println("done!")
 
+	fmt.Printf("done! read %v lines\n", cnt.Load())
 	return nil
 }
 
 func main() {
-	fmt.Println(runtime.GOMAXPROCS(-1))
 	start := time.Now()
-
 	defer (func() {
 		if r := recover(); r != nil {
 			fmt.Printf("dereader: %v", r)
@@ -224,12 +214,4 @@ func main() {
 
 	err = bkeep.readFiles()
 	check(err, errors.New("reading BEE results"))
-
-	// 2_858_778
-	// 2_863_224
-	var count int
-	for _, x := range lines {
-		count += x
-	}
-	fmt.Println(count)
 }
