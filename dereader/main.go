@@ -9,12 +9,15 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cloud-gov/billing/dereader/focus"
 	"github.com/gocarina/gocsv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -142,20 +145,128 @@ func (b *BeeKeeper) getFiles() (*tm.DownloadDirectoryOutput, error) {
 	return o, e
 }
 
-func (b *BeeKeeper) readLinesChan(lc <-chan *FocusSpec, cnt *atomic.Uint32) error {
-	for range lc {
-		// fmt.Println(ln.ConsumedQuantity.Decimal.String(), ln.ConsumedUnit)
+type Latest struct {
+	ld time.Time
+	mu sync.Mutex
+}
+
+func (l *Latest) set(t time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ld = t
+}
+
+var latest = Latest{ld: time.Date(2026, 4, 1, 0, 0, 0, 0, time.Now().Location())}
+
+const (
+	AwsSvcNameDB     = "Amazon Relational Database Service"
+	AwsSvcNameStore  = "Amazon Simple Storage Service"
+	AwsSvcNameMailer = "Amazon Simple Notification Service"
+)
+
+var (
+	AwsSkuMeterMatchDB     = regexp.MustCompile("RDS:.*-Storage$")
+	AwsSkuMeterMatchStore  = regexp.MustCompile("-TimedStorage-")
+	AwsSkuMeterMatchMailer = regexp.MustCompile("")
+)
+
+type AwsFocusLine struct {
+	focus.Spec
+}
+
+func (afl *AwsFocusLine) GetResource() *focus.Resource {
+	if afl.Resource != nil {
+		return afl.Resource
+	}
+
+	t := afl.Tags
+	r := &focus.Resource{
+		OrgID:        t["Organization GUID"],
+		SpaceID:      t["Space GUID"],
+		InstanceID:   t["Instance GUID"],
+		OrgName:      t["Organization name"],
+		SpaceName:    t["Space name"],
+		SvcPlanName:  t["Service plan name"],
+		SvcOfferName: t["Service offering name"],
+	}
+
+	afl.Resource = r
+	return r
+}
+
+func (afl *AwsFocusLine) GetResourceID() string {
+	return afl.GetResource().InstanceID
+}
+
+func (afl *AwsFocusLine) isMetered() bool {
+	var matcher *regexp.Regexp
+
+	switch afl.ServiceName {
+	case AwsSvcNameDB:
+		matcher = AwsSkuMeterMatchDB
+	case AwsSvcNameStore:
+		matcher = AwsSkuMeterMatchStore
+	default:
+		return false
+	}
+
+	return matcher.MatchString(afl.SkuMeter)
+}
+
+func (b *BeeKeeper) procLines(lchan <-chan *AwsFocusLine, cnt *atomic.Uint32, cat *SMap) error {
+	for line := range lchan {
+		if line.GetResourceID() == "" {
+			continue
+		}
+
+		if line.ChargePeriodStart.After(latest.ld) {
+			latest.set(line.ChargePeriodStart)
+		}
+
+		cat.SvcNames.Store(line.ServiceName, true)
+		cat.SubCats.Store(line.ServiceSubcategory, true)
+		cat.PriceCats.Store(line.PricingCategory, true)
+		cat.ChargeCats.Store(line.ChargeCategory, true)
+
+		if line.isMetered() {
+			fmt.Println("resource id:", line.GetResourceID())
+			fmt.Println("use:", line.ConsumedQuantity.Decimal.String(), line.ConsumedUnit)
+			fmt.Println("period:",
+				line.ChargePeriodStart.Format("01/02 15:04"),
+				"–",
+				line.ChargePeriodEnd.Format("01/02 15:04"),
+			)
+			// TODO: find period, is already recorded for period?
+		}
+		// if SvcNameRDS.Is(l) && strings.Contains(l.SkuMeter, "-Storage") {
+		// 	fmt.Println(l)
+		// }
+		// if SvcNameS3.Is(l) && strings.Contains(l.SkuMeter, "-TimedStorage-") {
+		// 	fmt.Println(l)
+		// }
+
 		cnt.Add(1)
 	}
 	return nil
 }
 
-func (b *BeeKeeper) readFiles() error {
+type SMap struct {
+	PriceCats  sync.Map
+	ChargeCats sync.Map
+	SubCats    sync.Map
+	SvcNames   sync.Map
+	RdsSkus    sync.Map
+	S3Skus     sync.Map
+	SvsCats    sync.Map
+}
+
+func (b *BeeKeeper) procFiles() error {
 	fsys := os.DirFS(b.localPath)
 	chkErr := b.check.withLabels("readFiles")
 
 	wg := sync.WaitGroup{}
 	cnt := atomic.Uint32{}
+	smap := SMap{}
 
 	err := fs.WalkDir(fsys, ".", func(path string, dir fs.DirEntry, err error) error {
 		chkErr(err, "walking dir, inner")
@@ -169,10 +280,10 @@ func (b *BeeKeeper) readFiles() error {
 		zr, err := gzip.NewReader(file)
 		chkErr(err, fmt.Sprintf("could not unzip: '%s'", path))
 
-		lc := make(chan *FocusSpec, 10)
+		lc := make(chan *AwsFocusLine, 10)
 
 		wg.Go(func() { chkErr(gocsv.UnmarshalToChan(zr, lc), "unmarshalling to channel") })
-		wg.Go(func() { chkErr(b.readLinesChan(lc, &cnt), "reading lines") })
+		wg.Go(func() { chkErr(b.procLines(lc, &cnt, &smap), "reading lines") })
 
 		return nil
 	})
@@ -182,6 +293,22 @@ func (b *BeeKeeper) readFiles() error {
 	wg.Wait()
 
 	fmt.Printf("done! read %v lines\n", cnt.Load())
+	fmt.Printf("latest: %s\n\n", latest.ld)
+
+	v := reflect.ValueOf(&smap)
+	e := v.Elem()
+	t := e.Type()
+	for i := 0; i < e.NumField(); i++ {
+		fmt.Printf("%s:\n", t.Field(i).Name)
+		field := e.Field(i)
+		ptr := field.Addr().Interface()
+		ptr.(*sync.Map).Range(func(key any, value any) bool {
+			fmt.Printf("\t%s\n", key)
+			return true
+		})
+		fmt.Println("")
+	}
+
 	return nil
 }
 
@@ -212,6 +339,6 @@ func main() {
 	// _, err = bkeep.getFiles()
 	// check(err, errors.New("downloading directory"))
 
-	err = bkeep.readFiles()
+	err = bkeep.procFiles()
 	check(err, errors.New("reading BEE results"))
 }

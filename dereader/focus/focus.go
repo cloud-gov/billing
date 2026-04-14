@@ -1,4 +1,5 @@
-package main
+// Package focus implements the FinOps Cost and Usage Specification (FOCUS)
+package focus
 
 import (
 	"encoding/json"
@@ -7,7 +8,28 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type FocusSpec struct {
+type Resource struct {
+	OrgID      string
+	SpaceID    string
+	InstanceID string
+
+	OrgName   string
+	SpaceName string
+
+	SvcPlanName  string
+	SvcOfferName string
+}
+
+type Reader interface {
+	IsMetered() bool
+
+	GetResource() *Resource
+	GetResourceID() string
+}
+
+type Spec struct {
+	Resource *Resource
+
 	AvailabilityZone           string              `json:"availabilityZone,omitempty"`
 	BilledCost                 decimal.NullDecimal `json:"billedCost"`
 	BillingAccountID           string              `json:"billingAccountId,omitempty"`
