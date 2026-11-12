@@ -19,7 +19,6 @@ import (
 	"github.com/cloud-gov/billing/internal/db"
 	"github.com/cloud-gov/billing/internal/dbx"
 	"github.com/cloud-gov/billing/internal/jobs"
-	"github.com/cloud-gov/billing/internal/migrate"
 	"github.com/cloud-gov/billing/internal/server"
 	"github.com/cloud-gov/billing/internal/usage/meter"
 	"github.com/cloud-gov/billing/internal/usage/reader"
@@ -81,11 +80,11 @@ func run(ctx context.Context, out io.Writer) error {
 		return fmtErr(ErrDBConn, err)
 	}
 
-	logger.Debug("run: migrating the database")
-	err = migrate.Migrate(ctx, conn)
-	if err != nil {
-		return fmtErr(ErrDBMigration, err)
-	}
+	// logger.Debug("run: migrating the database")
+	// err = migrate.Migrate(ctx, conn)
+	// if err != nil {
+	// 	return fmtErr(ErrDBMigration, err)
+	// }
 
 	q := dbx.NewQuerier(db.New(conn))
 
