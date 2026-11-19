@@ -49,7 +49,7 @@ resource "cloudfoundry_app" "billing" {
 }
 
 data "cloudfoundry_service_plan" "rds" {
-  name                  = "small-psql"
+  name                  = var.rds_database_plan
   service_offering_name = "aws-rds"
 }
 

@@ -214,6 +214,7 @@ jobs:
           TF_VAR_path: ../../.. # terraform-templates, relative to TEMPLATE_SUBDIR, where terraform executes
           TF_VAR_short_ref: ((.:short-ref))
           TF_VAR_space_name: ((space-name))
+          TF_VAR_rds_database_plan: ((prod-rds-database-plan))
 
   - name: terraform-apply-billing-production
     plan:
