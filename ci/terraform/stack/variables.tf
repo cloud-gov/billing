@@ -40,3 +40,9 @@ variable "short_ref" {
   type        = string
   description = "The git short ref of the current commit. E.g. a1b2c3d."
 }
+
+variable "rds_database_plan" {
+  type        = string
+  description = "Name of RDS database brokered service plan to use"
+  default     = "small-psql"
+}
