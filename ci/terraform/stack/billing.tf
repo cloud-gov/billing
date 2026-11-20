@@ -44,7 +44,7 @@ resource "cloudfoundry_app" "billing" {
   }]
 
   service_bindings = [{
-    service_instance = cloudfoundry_service_instance.db.name
+    service_instance = cloudfoundry_service_instance.billing_db.name
   }]
 }
 
@@ -53,7 +53,18 @@ data "cloudfoundry_service_plan" "rds" {
   service_offering_name = "aws-rds"
 }
 
-resource "cloudfoundry_service_instance" "db" {
+# In order to update the database to a new plan, we
+# had to instruct to Terraform to remove the previous resource
+# definition from its state, otherwise it tried to delete
+# the previous database in order to create the new one.
+removed {
+  from = cloudfoundry_service_instance.db
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "cloudfoundry_service_instance" "billing_db" {
   name         = "billing-db"
   space        = data.cloudfoundry_space.services.id
   type         = "managed"
