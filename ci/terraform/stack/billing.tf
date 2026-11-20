@@ -53,7 +53,8 @@ data "cloudfoundry_service_plan" "rds" {
   service_offering_name = "aws-rds"
 }
 
-resource "cloudfoundry_service_instance" "billing_db" {
+# This resource is no longer used. See removed block below
+resource "cloudfoundry_service_instance" "db" {
   name         = "billing-db"
   space        = data.cloudfoundry_space.services.id
   type         = "managed"
@@ -74,5 +75,18 @@ removed {
   from = cloudfoundry_service_instance.db
   lifecycle {
     destroy = false
+  }
+}
+
+resource "cloudfoundry_service_instance" "billing_db" {
+  name         = "billing-db"
+  space        = data.cloudfoundry_space.services.id
+  type         = "managed"
+  service_plan = data.cloudfoundry_service_plan.rds.id
+  parameters   = jsonencode({ "storage" : 20 })
+
+  # Prevent deleting the database by accident.
+  lifecycle {
+    prevent_destroy = true
   }
 }
