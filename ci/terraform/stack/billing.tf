@@ -71,7 +71,7 @@ resource "cloudfoundry_service_instance" "billing_db" {
 # definition from its state, otherwise it tried to delete
 # the previous database in order to create the new one.
 removed {
-  from = "cloudfoundry_service_instance.db"
+  from = cloudfoundry_service_instance.db
   lifecycle {
     destroy = false
   }
