@@ -44,27 +44,13 @@ resource "cloudfoundry_app" "billing" {
   }]
 
   service_bindings = [{
-    service_instance = cloudfoundry_service_instance.db.name
+    service_instance = cloudfoundry_service_instance.billing_db.name
   }]
 }
 
 data "cloudfoundry_service_plan" "rds" {
   name                  = var.rds_database_plan
   service_offering_name = "aws-rds"
-}
-
-# This resource is no longer used. See removed block below
-resource "cloudfoundry_service_instance" "db" {
-  name         = "billing-db"
-  space        = data.cloudfoundry_space.services.id
-  type         = "managed"
-  service_plan = data.cloudfoundry_service_plan.rds.id
-  parameters   = jsonencode({ "storage" : 20 })
-
-  # Prevent deleting the database by accident.
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # In order to update the database to a new plan, we
