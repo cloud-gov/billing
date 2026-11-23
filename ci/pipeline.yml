@@ -265,7 +265,7 @@ resources:
     source:
       commit_verification_keys: ((cloud-gov-pgp-keys))
       uri: https://github.com/cloud-gov/billing.git
-      branch: main
+      branch: ((src-branch))
 
   - name: terraform-plugin-cache
     type: s3-iam
