@@ -9,6 +9,6 @@ output "space_name" {
 }
 
 output "app_name" {
-  value       = cloudfoundry_app.billing.name
+  value       = cloudfoundry_app.billing_app.name
   description = "Used by the terraform-cleanup step."
 }
