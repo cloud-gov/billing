@@ -17,7 +17,14 @@ data "archive_file" "app_zip" {
   output_path = "./billing.zip"
 }
 
-resource "cloudfoundry_app" "billing" {
+removed {
+  from = cloudfoundry_app.billing
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "cloudfoundry_app" "billing_app" {
   name       = "billing"
   org_name   = var.org_name
   space_name = var.space_name
