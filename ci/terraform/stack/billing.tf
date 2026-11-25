@@ -37,7 +37,6 @@ resource "cloudfoundry_app" "billing_app" {
   instances  = var.instances
   memory     = "128M"
   disk_quota = "2G"
-  stopped = true
 
   environment = merge(
     {
